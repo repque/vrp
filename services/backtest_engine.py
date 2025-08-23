@@ -184,15 +184,15 @@ class BacktestEngine:
                 # Execute trades based on signal
                 new_position = self._execute_trade(signal, current_position)
                 
-                # Calculate P&L if position changed
+                # Calculate P&L for position held during this period
                 pnl = 0
-                if new_position != current_position and i > 0:
+                if i > 0:  # Need previous day for P&L calculation
                     pnl = self._calculate_trade_pnl(
                         data[i-1], data[i], current_position, new_position
                     )
                 
-                # Record trade if action taken
-                if signal != "HOLD" or new_position != current_position:
+                # Record trade for every signal (not just position changes)
+                if signal != "HOLD":
                     # Get VRP data for this date
                     current_vrp_data = volatility_data[-1]  # Latest data point
                     
@@ -232,12 +232,15 @@ class BacktestEngine:
         # Use base position size from configuration
         position_size = float(self.calculator.config.BASE_POSITION_SIZE)
         
-        if signal == "BUY_VOL" and current_position <= 0:
+        if signal == "BUY_VOL":
+            # Always go long volatility (positive position)
             return position_size
-        elif signal == "SELL_VOL" and current_position >= 0:
+        elif signal == "SELL_VOL":
+            # Always go short volatility (negative position)
             return -position_size
         elif signal == "HOLD":
-            return 0
+            # Keep current position (don't close positions on HOLD)
+            return current_position
         else:
             return current_position  # No change
     
@@ -261,16 +264,20 @@ class BacktestEngine:
             P&L for the trade
         """
         try:
-            # Simplified P&L calculation using IV change
-            # In practice, this would use actual option or ETF prices
-            iv_change = (
+            # Calculate P&L based on position held during the period
+            # Use the position we held BEFORE the trade (old_position)
+            if abs(old_position) < 1e-6:  # No position held
+                return 0.0
+            
+            # Calculate IV change (percentage)
+            iv_change_pct = (
                 float(curr_data.iv) - float(prev_data.iv)
             ) / float(prev_data.iv)
             
-            # Volatility positions have inverse relationship with IV
-            # (buying vol benefits from IV increase)
-            effective_position = (old_position + new_position) / 2
-            pnl = effective_position * iv_change
+            # Volatility positions profit from IV changes in the same direction:
+            # - Long vol (positive position) profits when IV increases (positive change)
+            # - Short vol (negative position) profits when IV decreases (negative change)
+            pnl = old_position * iv_change_pct
             
             return pnl
             
