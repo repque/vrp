@@ -202,7 +202,7 @@ class VRPTrader:
     
     def backtest(self, start_date: str = None, end_date: str = None) -> Dict[str, Any]:
         """
-        Backtest functionality is temporarily disabled pending API updates.
+        Backtest the predictive VRP strategy using backtest engine service.
         
         Args:
             start_date: Start date for backtest (YYYY-MM-DD)
@@ -211,15 +211,20 @@ class VRPTrader:
         Returns:
             Dictionary with backtest results
         """
-        logger.warning("Backtest functionality temporarily disabled - predictive system updates in progress")
-        return {
-            "status": "disabled",
-            "message": "Backtest functionality temporarily disabled pending API updates for predictive system",
-            "total_return": 0.0,
-            "sharpe_ratio": 0.0,
-            "max_drawdown": 0.0,
-            "total_trades": 0
-        }
+        if not self.data:
+            logger.error("No data loaded for backtest")
+            return {}
+        
+        try:
+            # Use backtest engine service with predictive system
+            return self.backtest_engine.run_backtest(
+                self.data, 
+                start_date, 
+                end_date
+            )
+        except (InsufficientDataError, CalculationError, ModelStateError) as e:
+            logger.error(f"Backtest failed: {e}")
+            return {}
     
     def get_trading_signal_details(self) -> Optional[TradingSignal]:
         """

@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 
 from src.models.data_models import MarketData
-from src.utils.exceptions import InsufficientDataError, CalculationError
+from src.utils.exceptions import InsufficientDataError, CalculationError, ModelStateError
 from .vrp_calculator import VRPCalculator
 from .signal_generator import SignalGenerator
 
@@ -148,17 +148,30 @@ class BacktestEngine:
         trades = []
         current_position = 0
         
-        # Start after lookback period to ensure we have enough data
-        for i in range(lookback_days, len(data)):
-            # Calculate VRP for this historical point
-            historical_data = data[max(0, i-lookback_days):i+1]
+        # Need sufficient data for volatility calculations and Markov chain
+        min_data_required = max(lookback_days, 90)  # Need more data for predictions
+        
+        # Start after minimum required period
+        for i in range(min_data_required, len(data)):
+            # Get historical data up to current point for predictive modeling
+            # Use larger window for better Markov chain predictions
+            historical_data = data[max(0, i-200):i+1]
             
             try:
-                vrp_ratio = self.calculator.calculate_vrp_ratio(historical_data, lookback_days)
-                vrp_state = self.calculator.classify_vrp_state(vrp_ratio)
+                # Generate volatility data for Markov chain processing
+                volatility_data = self.calculator.generate_volatility_data(historical_data)
                 
-                # Generate signal for this point in time
-                signal, reason = self.signal_generator.generate_signal(vrp_ratio, vrp_state)
+                if len(volatility_data) < 60:  # Need minimum data for transition matrix
+                    continue
+                    
+                # Generate predictive signal using Markov chain model
+                trading_signal = self.signal_generator.generate_signal(volatility_data)
+                
+                signal = trading_signal.signal_type
+                reason = trading_signal.reason
+                current_state = trading_signal.current_state
+                predicted_state = trading_signal.predicted_state
+                confidence = float(trading_signal.confidence_score)
                 
                 # Execute trades based on signal
                 new_position = self._execute_trade(signal, current_position)
@@ -172,11 +185,16 @@ class BacktestEngine:
                 
                 # Record trade if action taken
                 if signal != "HOLD" or new_position != current_position:
+                    # Get VRP data for this date
+                    current_vrp_data = volatility_data[-1]  # Latest data point
+                    
                     trades.append({
                         'date': data[i].date,
                         'signal': signal,
-                        'vrp_ratio': vrp_ratio,
-                        'vrp_state': vrp_state.name,
+                        'vrp_ratio': float(current_vrp_data.vrp),
+                        'current_state': current_state.name,
+                        'predicted_state': predicted_state.name,
+                        'confidence': confidence,
                         'position_before': current_position,
                         'position_after': new_position,
                         'pnl': pnl,
@@ -185,7 +203,7 @@ class BacktestEngine:
                 
                 current_position = new_position
                 
-            except (InsufficientDataError, CalculationError) as e:
+            except (InsufficientDataError, CalculationError, ModelStateError) as e:
                 logger.warning(f"Skipping date {data[i].date} due to calculation error: {e}")
                 continue
         
@@ -203,7 +221,8 @@ class BacktestEngine:
         Returns:
             New position size
         """
-        position_size = self.signal_generator.get_position_size()
+        # Use base position size from configuration
+        position_size = float(self.calculator.config.BASE_POSITION_SIZE)
         
         if signal == "BUY_VOL" and current_position <= 0:
             return position_size
