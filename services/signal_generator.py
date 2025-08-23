@@ -151,30 +151,31 @@ class SignalGenerator:
         normal_prob = state_probabilities.get(VRPState.NORMAL_PREMIUM, 0)
         
         # Signal logic based on predicted state transitions
-        # CORRECTED LOGIC: VRP Mean Reversion Strategy
-        # When VRP will be LOW (undervalued): BUY volatility (price will increase)
-        # When VRP will be HIGH (overvalued): SELL volatility (price will decrease)
+        # CORRECT VRP MOMENTUM FOLLOWING LOGIC:
+        # Model detects VRP trends over 60-day windows - trade WITH the predicted direction
+        # When VRP trending to LOW states: SELL volatility (ride the downward trend)
+        # When VRP trending to HIGH states: BUY volatility (ride the upward trend)
         if low_states_prob > 0.6:  # High probability of moving to undervalued states
-            signal_type = "BUY_VOL"  # CORRECTED: Buy when VRP will be low (undervalued, will mean revert UP)
+            signal_type = "SELL_VOL"  # Sell volatility - ride the VRP downtrend
             signal_strength = low_states_prob
-            reason = f"Model predicts {low_states_prob:.1%} probability of undervalued VRP states - buy for mean reversion UP"
+            reason = f"Model predicts {low_states_prob:.1%} probability of undervalued VRP states - sell vol to ride downtrend"
             
         elif high_states_prob > 0.6:  # High probability of moving to overvalued states
-            signal_type = "SELL_VOL"  # CORRECTED: Sell when VRP will be high (overvalued, will mean revert DOWN)
+            signal_type = "BUY_VOL"  # Buy volatility - ride the VRP uptrend
             signal_strength = high_states_prob
-            reason = f"Model predicts {high_states_prob:.1%} probability of overvalued VRP states - sell for mean reversion DOWN"
+            reason = f"Model predicts {high_states_prob:.1%} probability of overvalued VRP states - buy vol to ride uptrend"
             
         elif current_state == VRPState.EXTREME_LOW and low_states_prob < 0.3:
-            # Currently extremely low but model predicts mean reversion UP
-            signal_type = "BUY_VOL"  # CORRECT: Buy when VRP is extremely low (will mean revert higher)
+            # Currently extremely low VRP but model predicts trend reversal upward
+            signal_type = "BUY_VOL"  # Buy volatility - expecting VRP uptrend
             signal_strength = 1.0 - low_states_prob
-            reason = f"Mean reversion UP from extreme low VRP expected ({low_states_prob:.1%} persistence)"
+            reason = f"VRP extremely low with upward trend predicted ({low_states_prob:.1%} persistence) - buy vol for trend reversal"
             
         elif current_state == VRPState.EXTREME_HIGH and high_states_prob < 0.3:
-            # Currently extremely high but model predicts mean reversion DOWN
-            signal_type = "SELL_VOL"  # CORRECT: Sell when VRP is extremely high (will mean revert lower)
+            # Currently extremely high VRP but model predicts trend reversal downward
+            signal_type = "SELL_VOL"  # Sell volatility - expecting VRP downtrend
             signal_strength = 1.0 - high_states_prob
-            reason = f"Mean reversion DOWN from extreme high VRP expected ({high_states_prob:.1%} persistence)"
+            reason = f"VRP extremely high with downward trend predicted ({high_states_prob:.1%} persistence) - sell vol for trend reversal"
             
         else:
             # No clear directional signal

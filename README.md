@@ -23,11 +23,32 @@ When VRP is high, options are expensive relative to actual market movement. When
 
 ### The Trading Strategy
 
-The system follows a mean reversion approach:
+The system follows a **predictive VRP momentum** approach:
 
-1. **When VRP is high (overvalued volatility)**: Expect volatility to decrease → Buy volatility to profit when it reverts down
-2. **When VRP is low (undervalued volatility)**: Expect volatility to increase → Sell volatility to profit when it reverts up
-3. **When VRP is normal**: No clear directional edge → Hold position
+1. **When VRP trending higher**: Model predicts movement toward overvalued states → **Buy volatility** to ride the upward trend
+2. **When VRP trending lower**: Model predicts movement toward undervalued states → **Sell volatility** to ride the downward trend
+3. **When VRP trend unclear**: Balanced probabilities → Hold position
+
+**Key Insight**: Our Markov model detects VRP **trends and momentum** over 60-day windows. Rather than assuming mean reversion, we trade **with** the predicted VRP direction.
+
+### Trading Timeframes and Execution
+
+**Signal Generation Window:**
+- Uses 60-day rolling windows to build transition matrices
+- Predicts next-day VRP state probabilities
+- Generates daily signals (BUY_VOL, SELL_VOL, HOLD)
+
+**Position Management:**
+- **Entry**: Take positions based on daily signal generation
+- **Holding Period**: Positions held until signal changes (typically 1-5 days)
+- **Exit**: Close position when new signal conflicts with current position
+- **No explicit profit targets**: System relies on signal changes for exits
+
+**Data Requirements:**
+- **IV Source**: Use at-the-money (ATM) options with 30-day expiration
+- **IV Timing**: End-of-day implied volatility closing values
+- **Update Frequency**: Daily signal generation after market close
+- **Minimum History**: 90 days (30 for volatility calculation + 60 for Markov modeling)
 
 ### System Components
 
@@ -62,11 +83,11 @@ The matrix is updated using a 60-day rolling window with Laplace smoothing for s
 
 Based on the predicted state probabilities:
 
-- **BUY_VOL**: If model predicts >60% chance of moving to overvalued states
-- **SELL_VOL**: If model predicts >60% chance of moving to undervalued states  
+- **BUY_VOL**: If model predicts >60% chance of moving to overvalued states (ride the VRP uptrend)
+- **SELL_VOL**: If model predicts >60% chance of moving to undervalued states (ride the VRP downtrend)
 - **HOLD**: If probabilities are balanced or uncertain
 
-The system also considers mean reversion patterns - if currently in an extreme state but model predicts low persistence, it generates a contrarian signal.
+The system also considers trend reversals - if currently in an extreme state but model predicts low persistence, it generates a reversal signal.
 
 #### 4. Position Sizing
 
@@ -83,8 +104,10 @@ date,open,high,low,close,volume,iv
 2024-01-15,480.50,482.75,479.25,481.80,85000000,0.1625
 ```
 
-- **OHLCV**: Standard price and volume data
-- **IV**: Implied volatility as decimal (0.16 = 16%)
+- **OHLCV**: Standard price and volume data for underlying asset
+- **IV**: Implied volatility as decimal (0.16 = 16%) from ATM 30-day options
+- **Frequency**: Daily end-of-day values (no intraday data required)
+- **Source**: Use VIX for SPY, or calculate IV from ATM options for other assets
 - **Minimum**: 90 days of data (30 for volatility calculation + 60 for modeling)
 
 ## Usage
@@ -110,7 +133,20 @@ Generated predictive signal: BUY_VOL |
 Current: ELEVATED_PREMIUM | 
 Predicted: ELEVATED_PREMIUM | 
 Confidence: 0.832 | 
-Reason: Model predicts 80.0% probability of overvalued VRP states - buy for mean reversion
+Reason: Model predicts 80.0% probability of overvalued VRP states - buy vol to ride uptrend
+```
+
+### Example Trade Lifecycle
+```
+Day 1 (Monday 4:00 PM): System generates BUY_VOL signal (confidence: 0.75)
+Day 2 (Tuesday 9:30 AM): Enter long VIX calls or UVXY position 
+Day 2 (Tuesday 4:00 PM): System generates HOLD signal - maintain position
+Day 3 (Wednesday 4:00 PM): System generates HOLD signal - maintain position  
+Day 4 (Thursday 4:00 PM): System generates SELL_VOL signal - exit long position
+Day 5 (Friday 9:30 AM): Enter short volatility position (SVXY or VIX puts)
+
+Total hold time: 3 days
+Profit/Loss: Determined by volatility movement during hold period
 ```
 
 ## Implementation Details
@@ -147,19 +183,30 @@ src/models/
 ## Trading Implementation
 
 ### BUY_VOL Signals
-- Buy VIX call options
-- Long volatility ETFs (UVXY, VXX)  
-- Short inverse volatility ETFs (SVXY)
+- **Options**: Buy VIX calls (30-45 DTE for time decay management)
+- **ETFs**: Long volatility ETFs (UVXY, VXX, VIXY)
+- **Inverse ETFs**: Short inverse volatility ETFs (SVXY, XIV if available)
+- **Timing**: Enter positions after market close when signal generated
 
 ### SELL_VOL Signals  
-- Sell VIX calls or buy VIX puts
-- Short volatility ETFs
-- Long inverse volatility ETFs
+- **Options**: Sell VIX calls or buy VIX puts (30-45 DTE)
+- **ETFs**: Short volatility ETFs (UVXY, VXX) or long inverse ETFs (SVXY)
+- **Spreads**: VIX call credit spreads for defined risk
+- **Timing**: Enter positions after market close when signal generated
+
+### Position Management Timeline
+- **Signal Check**: Daily after market close (4:00 PM ET)
+- **Entry Window**: Next trading day market open (9:30 AM ET)
+- **Position Review**: Daily basis - hold until signal changes
+- **Average Hold Time**: 2-4 trading days based on backtest analysis
+- **Exit Trigger**: New conflicting signal or position reaches maximum hold period (7 days)
 
 ### Risk Management
-- Position sizing based on signal confidence
-- Maximum position limits
-- Drawdown monitoring and alerts
+- **Position Sizing**: Based on signal confidence (higher confidence = larger position)
+- **Maximum Position**: 5% of portfolio per signal (from configuration)
+- **Stop Loss**: None - system relies on signal changes for exits
+- **Time Decay Protection**: Use 30-45 DTE options to minimize theta impact
+- **Correlation Limits**: Maximum 3 concurrent volatility positions
 
 ## System Properties
 
