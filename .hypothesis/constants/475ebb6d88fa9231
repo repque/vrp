@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/src/models/validators.py
+# hypothesis_version: 6.138.2
+
+['0', '1', '1.0', 'after', 'alert level', 'alert_level', 'before', 'close', 'entropy trend', 'entropy_trend', 'high', 'implied_vol', 'iv', 'low', 'matrix', 'min_data_years', 'open', 'preferred_data_years', 'profit_factor', 'realized_vol_30d', 'rolling_window_days', 'signal type', 'signal_type', 'volume', 'vrp']

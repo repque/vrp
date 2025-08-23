@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/src/data/volatility_calculator.py
+# hypothesis_version: 6.138.2
+
+[0.0, 0.1, 0.5, 0.8, 10.0, 100.0, 100, 252, 'implied_vol_stats', 'max', 'mean', 'median', 'min', 'percentile_25', 'percentile_75', 'realized_vol_stats', 'state_distribution', 'state_percentages', 'std', 'total_observations', 'vrp_stats']

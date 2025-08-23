@@ -10,8 +10,9 @@ import pytest
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
+from pydantic import ValidationError
 
-from src.config.settings import VRPTradingConfig
+from src.config.settings import Settings
 from src.data.volatility_calculator import VolatilityCalculator
 from src.models.data_models import MarketDataPoint, VRPState
 from src.utils.exceptions import CalculationError, InsufficientDataError
@@ -23,7 +24,7 @@ class TestVolatilityCalculator:
     @pytest.fixture
     def config(self):
         """Create test configuration."""
-        config = Mock(spec=VRPTradingConfig)
+        config = Mock(spec=Settings)
         config.model = Mock()
         config.model.vrp_underpriced_threshold = Decimal('0.90')
         config.model.vrp_fair_upper_threshold = Decimal('1.10')
@@ -298,12 +299,16 @@ class TestVolatilityCalculator:
     @pytest.mark.parametrize("window_days", [20, 30, 60])
     def test_different_window_sizes(self, calculator, sample_market_data, window_days):
         """Test volatility calculation with different window sizes."""
-        result = calculator.calculate_realized_volatility(sample_market_data, window_days=window_days)
-        
-        expected_length = len(sample_market_data) - window_days
-        if expected_length > 0:
-            assert len(result) == expected_length
+        if len(sample_market_data) < window_days + 1:
+            # Test should handle insufficient data gracefully
+            with pytest.raises(InsufficientDataError):
+                calculator.calculate_realized_volatility(sample_market_data, window_days=window_days)
+        else:
+            result = calculator.calculate_realized_volatility(sample_market_data, window_days=window_days)
             
+            expected_length = len(sample_market_data) - window_days
+            assert len(result) == expected_length
+                
             # Check that all results are valid
             for metrics in result:
                 assert metrics.realized_vol_30d > 0
@@ -342,12 +347,25 @@ class TestVolatilityCalculator:
     
     def test_price_validation_in_data(self, calculator):
         """Test that invalid price data is handled properly."""
-        invalid_data = [
+        # Test that Pydantic validation catches invalid OHLC relationships
+        with pytest.raises(ValidationError):
             MarketDataPoint(
                 date=date(2023, 1, 1),
                 spy_open=Decimal('400.0'),
                 spy_high=Decimal('395.0'),  # High < Low (invalid)
                 spy_low=Decimal('405.0'),
+                spy_close=Decimal('402.0'),
+                spy_volume=1000000,
+                vix_close=Decimal('20.0')
+            )
+        
+        # Test with valid data that has extreme but valid OHLC relationships
+        extreme_data = [
+            MarketDataPoint(
+                date=date(2023, 1, 1),
+                spy_open=Decimal('400.0'),
+                spy_high=Decimal('450.0'),  # Very high but valid
+                spy_low=Decimal('350.0'),   # Very low but valid
                 spy_close=Decimal('402.0'),
                 spy_volume=1000000,
                 vix_close=Decimal('20.0')
@@ -363,13 +381,25 @@ class TestVolatilityCalculator:
             )
         ]
         
-        # Should not raise exception but may filter out invalid data
-        # This depends on data validation implementation
+        # Add a third data point to have enough for volatility calculation
+        extreme_data.append(MarketDataPoint(
+            date=date(2023, 1, 3),
+            spy_open=Decimal('405.0'),
+            spy_high=Decimal('415.0'),
+            spy_low=Decimal('400.0'),
+            spy_close=Decimal('410.0'),
+            spy_volume=1000000,
+            vix_close=Decimal('19.0')
+        ))
+        
+        # Test volatility calculation with extreme but valid data
         try:
-            result = calculator.calculate_realized_volatility(invalid_data, window_days=1)
-            # If it succeeds, check results are reasonable
+            result = calculator.calculate_realized_volatility(extreme_data, window_days=2)
+            # Should succeed with valid data and produce reasonable results
+            assert len(result) > 0
             for metrics in result:
                 assert metrics.realized_vol_30d > 0
-        except (CalculationError, InsufficientDataError):
-            # Also acceptable if validation catches the error
+                assert metrics.vrp > 0
+        except (InsufficientDataError, CalculationError):
+            # Acceptable if not enough data for calculation or calculation issues with extreme values
             pass

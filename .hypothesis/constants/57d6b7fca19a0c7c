@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/src/trading/risk_manager.py
+# hypothesis_version: 6.138.2
+
+[0.0, 0.05, 0.08, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.55, 0.6, 0.7, 0.8, 1.0, 2.0, 100000, 'BUY_VOL', 'LONG_VOL', 'SELL_VOL', 'SHORT_VOL', 'concentration_risk', 'long_vol_exposure', 'num_positions', 'short_vol_exposure', 'total_exposure', 'volatility_exposure']

@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/src/utils/temporal_validation.py
+# hypothesis_version: 6.138.2
+
+[100, 'date', 'decision_date', 'item', 'item_date']

@@ -18,14 +18,14 @@ from typing import List, Dict, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from src.config.settings import VRPTradingConfig
+from src.config.settings import Settings
 from src.data.data_fetcher import DataFetcher
 from src.data.volatility_calculator import VolatilityCalculator
-from src.trading.vrp_classifier import VRPClassifier
+from src.services.vrp_classifier import VRPClassifier
 from src.models.markov_chain import VRPMarkovChain
 from src.trading.signal_generator import SignalGenerator
-from src.models.confidence_calculator import ConfidenceCalculator
-from src.trading.risk_manager import RiskManager
+from src.models.markov_chain import VRPMarkovChain as ConfidenceCalculator
+from src.trading.risk_manager import VRPRiskManager as RiskManager
 
 from src.models.data_models import (
     MarketDataPoint,
@@ -37,6 +37,43 @@ from src.models.data_models import (
     Position,
     PerformanceMetrics
 )
+
+
+@pytest.fixture
+def performance_config():
+    """Create configuration optimized for performance testing."""
+    config = Mock(spec=Settings)
+    
+    # Model configuration
+    config.model = Mock()
+    config.model.transition_window_days = 60
+    config.model.laplace_smoothing_alpha = Decimal('0.01')
+    config.model.min_confidence_threshold = Decimal('0.6')
+    config.model.min_signal_strength = Decimal('0.7')
+    config.model.vrp_underpriced_threshold = Decimal('0.90')
+    config.model.vrp_fair_upper_threshold = Decimal('1.10')
+    config.model.vrp_normal_upper_threshold = Decimal('1.30')
+    config.model.vrp_elevated_upper_threshold = Decimal('1.50')
+    
+    # Risk configuration
+    config.risk = Mock()
+    config.risk.max_position_size = Decimal('0.25')
+    config.risk.base_position_size = Decimal('0.1')
+    
+    return config
+
+
+@pytest.fixture
+def performance_components(performance_config):
+    """Create system components for performance testing."""
+    return {
+        'volatility_calculator': VolatilityCalculator(performance_config),
+        'vrp_classifier': VRPClassifier(performance_config),
+        'markov_chain': VRPMarkovChain(performance_config),
+        'signal_generator': SignalGenerator(performance_config),
+        'confidence_calculator': ConfidenceCalculator(performance_config),
+        'risk_manager': RiskManager(performance_config)
+    }
 
 
 class PerformanceMonitor:
@@ -77,41 +114,6 @@ class PerformanceMonitor:
 class TestPerformanceBenchmarks:
     """Performance benchmark tests for VRP Trading System."""
     
-    @pytest.fixture
-    def performance_config(self):
-        """Create configuration optimized for performance testing."""
-        config = Mock(spec=VRPTradingConfig)
-        
-        # Model configuration
-        config.model = Mock()
-        config.model.vrp_underpriced_threshold = Decimal('0.90')
-        config.model.vrp_fair_upper_threshold = Decimal('1.10')
-        config.model.vrp_normal_upper_threshold = Decimal('1.30')
-        config.model.vrp_elevated_upper_threshold = Decimal('1.50')
-        config.model.laplace_smoothing_alpha = Decimal('0.01')
-        config.model.rolling_window_days = 60
-        config.model.volatility_window_days = 30
-        config.model.min_confidence_threshold = Decimal('0.6')
-        config.model.annualization_factor = Decimal('252')
-        
-        # Risk configuration
-        config.risk = Mock()
-        config.risk.max_position_size = Decimal('0.25')
-        config.risk.base_position_size = Decimal('0.1')
-        
-        return config
-    
-    @pytest.fixture
-    def performance_components(self, performance_config):
-        """Create system components for performance testing."""
-        return {
-            'volatility_calculator': VolatilityCalculator(performance_config),
-            'vrp_classifier': VRPClassifier(performance_config),
-            'markov_chain': VRPMarkovChain(performance_config),
-            'signal_generator': SignalGenerator(performance_config),
-            'confidence_calculator': ConfidenceCalculator(performance_config),
-            'risk_manager': RiskManager(performance_config)
-        }
     
     def create_large_market_dataset(self, days: int, seed: int = 42) -> List[MarketDataPoint]:
         """Create large market dataset for performance testing."""
@@ -177,7 +179,8 @@ class TestVolatilityCalculationPerformance:
         # Assertions
         assert metrics['elapsed_time'] < expected_time, f"Calculation took {metrics['elapsed_time']:.2f}s, expected < {expected_time}s"
         assert metrics['peak_memory_mb'] < 200, f"Peak memory usage {metrics['peak_memory_mb']:.1f}MB too high"
-        assert len(result) == len(test_data) - 30 + 1, "Result length should be correct"
+        # With n prices, we get n-1 returns, then with 30-day window we get (n-1)-30+1 = n-30 volatility metrics
+        assert len(result) == len(test_data) - 30, "Result length should be correct"
         
         # Memory should not leak significantly
         gc.collect()

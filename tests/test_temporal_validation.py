@@ -82,7 +82,7 @@ class TestTemporalValidation:
             validate_no_forward_looking(decision_date, mixed_data)
         
         assert "Forward-looking bias detected" in str(exc_info.value)
-        assert "2023-06-16 > 2023-06-15" in str(exc_info.value)
+        assert "Item date 2023-06-16 > Decision date 2023-06-15" in str(exc_info.value)
     
     def test_validate_trading_decision_temporal_integrity(self):
         """Test comprehensive trading decision validation."""

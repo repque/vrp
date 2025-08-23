@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/vrp.py
+# hypothesis_version: 6.138.2
+
+[0.0005, 0.002, 0.003, 0.015, 0.02, 0.03, 0.05, 8.0, 20.0, 50.0, 400.0, 60000000, 120000000, '%Y-%m-%d', '2023-01-01', '2024-01-01', 'D', 'Loaded DataFrame', '__main__', 'close', 'date', 'high', 'iv', 'low', 'open', 'sample_data.csv', 'src', 'volume']

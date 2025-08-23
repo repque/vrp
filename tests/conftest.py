@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import List
 from unittest.mock import Mock
 
-from src.config.settings import VRPTradingConfig
+from src.config.settings import Settings, TradingConfig
 from src.models.data_models import (
     MarketData,
     VolatilityData,
@@ -20,7 +20,6 @@ from src.models.data_models import (
     TransitionMatrix,
     ModelPrediction,
     TradingSignal,
-    Position,
     PerformanceMetrics,
     ConfigurationSettings,
 )
@@ -29,7 +28,7 @@ from src.models.data_models import (
 @pytest.fixture
 def vrp_config():
     """Create comprehensive VRP trading configuration for testing."""
-    config = Mock(spec=VRPTradingConfig)
+    config = Mock(spec=TradingConfig)
     
     # Model configuration
     config.model = Mock()

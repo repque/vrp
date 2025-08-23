@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/src/data/data_fetcher.py
+# hypothesis_version: 6.138.2
+
+[1000.0, '0.0', '1d', 'SPY', 'VIX', 'chart', 'close', 'data', 'error', 'high', 'indicators', 'interval', 'low', 'max_retry_attempts', 'open', 'period1', 'period2', 'quote', 'rate_limit_delay_ms', 'result', 'retry_delay_seconds', 'timestamp', 'volume']

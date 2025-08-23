@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/services/__init__.py
+# hypothesis_version: 6.138.2
+
+['BacktestEngine', 'SignalGenerator', 'VRPCalculator']

@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/src/models/markov_chain.py
+# hypothesis_version: 6.138.2
+
+[0.0, 1e-10, 0.01, 0.1, 0.2, 0.3, 0.4, 0.7, 1.0, 1000, '0.0', '0.2', '_mock_name', 'data_quality', 'entropy', 'probability', 'stability']

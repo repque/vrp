@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/src/models/constants.py
+# hypothesis_version: 6.138.2
+
+[0.1, 0.3, 0.7, 0.9, 252, 365, 10000000000, '0.0', '0.000001', '0.02', '0.05', '0.6', '0.8', '1.0', '100000.0', '200.0', 'BUY_VOL', 'DECREASING', 'GREEN', 'HOLD', 'INCREASING', 'RED', 'SELL_VOL', 'SPY closing price', 'SPY high price', 'SPY low price', 'SPY opening price', 'SPY trading volume', 'STABLE', 'Sharpe ratio', 'VIX closing value', 'VRP ratio', 'YELLOW', 'implied volatility', 'position size', 'profit factor', 'realized volatility', 'win rate']

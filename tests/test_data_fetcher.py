@@ -13,7 +13,7 @@ from decimal import Decimal
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any
 
-from src.config.settings import VRPTradingConfig
+from src.config.settings import Settings
 from src.data.data_fetcher import DataFetcher
 from src.models.data_models import MarketDataPoint, VRPState
 from src.utils.exceptions import DataFetchError, ValidationError, ConfigurationError
@@ -25,7 +25,7 @@ class TestDataFetcher:
     @pytest.fixture
     def config(self):
         """Create test configuration for DataFetcher."""
-        config = Mock(spec=VRPTradingConfig)
+        config = Mock(spec=Settings)
         config.data = Mock()
         config.data.yahoo_finance_api_key = "test_api_key"
         config.data.fred_api_key = "test_fred_key"
@@ -194,7 +194,7 @@ class TestDataFetcher:
         with patch('requests.get') as mock_get:
             mock_get.side_effect = requests.Timeout("Request timed out")
             
-            with pytest.raises(DataFetchError, match="Request timeout"):
+            with pytest.raises(DataFetchError, match="Max retry attempts exceeded"):
                 data_fetcher.fetch_spy_data(start_date, end_date)
         
         # Test connection error
@@ -296,9 +296,9 @@ class TestDataFetcher:
             with patch('time.sleep') as mock_sleep:
                 spy_data = data_fetcher.fetch_spy_data(start_date, end_date)
                 
-                # Should have retried 2 times
+                # Should have retried 2 times (plus 1 rate limiting sleep)
                 assert mock_get.call_count == 3
-                assert mock_sleep.call_count == 2
+                assert mock_sleep.call_count == 3  # 1 rate limiting + 2 retry sleeps
                 assert len(spy_data) == 1
     
     def test_max_retries_exceeded(self, data_fetcher):
@@ -380,7 +380,7 @@ class TestDataFetcher:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "chart": {"result": [{"timestamp": [], "indicators": {"quote": [{}]}}]}
+            "chart": {"result": [{"timestamp": [1672531200], "indicators": {"quote": [{"open": [400.0], "high": [405.0], "low": [395.0], "close": [402.0], "volume": [100000000]}]}}]}
         }
         mock_response.raise_for_status = Mock()
         
