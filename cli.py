@@ -14,24 +14,32 @@ import os
 import logging
 from vrp import VRPTrader, create_sample_data
 
+# Configure logging for CLI
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+
 
 def interactive_mode():
     """Interactive command-line interface"""
-    print("🎯 VRP Trading System")
-    print("=" * 30)
+    logger.info("VRP Trading System")
+    logger.info("=" * 30)
     
     trader = VRPTrader()
     data_loaded = False
     
     while True:
-        print(f"\nData loaded: {'✅' if data_loaded else '❌'}")
-        print("\nWhat would you like to do?")
-        print("1. Load CSV data")
-        print("2. Get trading signal")
-        print("3. Run backtest")
-        print("4. Customize thresholds")
-        print("5. Create sample data")
-        print("6. Exit")
+        logger.info(f"\nData loaded: {'✅' if data_loaded else '❌'}")
+        logger.info("\nWhat would you like to do?")
+        logger.info("1. Load CSV data")
+        logger.info("2. Get trading signal")
+        logger.info("3. Run backtest")
+        logger.info("4. Customize thresholds")
+        logger.info("5. Create sample data")
+        logger.info("6. Exit")
         
         try:
             choice = input("\nEnter choice (1-6): ").strip()
@@ -44,30 +52,30 @@ def interactive_mode():
                 if os.path.exists(filename):
                     data_loaded = trader.load_data(filename)
                     if data_loaded:
-                        print(f"✅ Successfully loaded {filename}")
+                        logger.info(f"Successfully loaded {filename}")
                     else:
-                        print(f"❌ Failed to load {filename}")
+                        logger.error(f"Failed to load {filename}")
                 else:
-                    print(f"❌ File '{filename}' not found")
+                    logger.error(f"File '{filename}' not found")
                     
             elif choice == "2":
                 if not data_loaded:
-                    print("❌ Please load data first (option 1)")
+                    logger.error("Please load data first (option 1)")
                     continue
                 signal = trader.get_signal()
                 if signal:
                     vrp = trader.current_vrp
                     state = trader.current_state
-                    print(f"\n🎯 SIGNAL: {signal}")
-                    print(f"   VRP Ratio: {vrp:.2f}")
-                    print(f"   VRP State: {state.name}")
-                    print(f"   Position Size: {trader.position_size * 100}%")
+                    logger.info(f"\nSIGNAL: {signal}")
+                    logger.info(f"   VRP Ratio: {vrp:.2f}")
+                    logger.info(f"   VRP State: {state.name}")
+                    logger.info(f"   Position Size: {trader.position_size * 100}%")
                 else:
-                    print("❌ Unable to generate signal")
+                    logger.error("Unable to generate signal")
                 
             elif choice == "3":
                 if not data_loaded:
-                    print("❌ Please load data first (option 1)")
+                    logger.error("Please load data first (option 1)")
                     continue
                     
                 start_date = input("Start date (YYYY-MM-DD, or Enter for all): ").strip()
@@ -79,18 +87,18 @@ def interactive_mode():
                 )
                 
                 if results:
-                    print(f"\n📈 Backtest Results:")
-                    print(f"   Total Return: {results['total_return']:.2%}")
-                    print(f"   Win Rate: {results['win_rate']:.1%}")
-                    print(f"   Total Trades: {results['total_trades']}")
-                    print(f"   Winning Trades: {results['winning_trades']}")
-                    print(f"   Losing Trades: {results['losing_trades']}")
+                    logger.info(f"\nBacktest Results:")
+                    logger.info(f"   Total Return: {results['total_return']:.2%}")
+                    logger.info(f"   Win Rate: {results['win_rate']:.1%}")
+                    logger.info(f"   Total Trades: {results['total_trades']}")
+                    logger.info(f"   Winning Trades: {results['winning_trades']}")
+                    logger.info(f"   Losing Trades: {results['losing_trades']}")
                 else:
-                    print("❌ Backtest failed")
+                    logger.error("Backtest failed")
                 
             elif choice == "4":
-                print(f"\nCurrent thresholds:")
-                print(f"Buy: {trader.buy_threshold}, Sell: {trader.sell_threshold}, Size: {trader.position_size}")
+                logger.info(f"\nCurrent thresholds:")
+                logger.info(f"Buy: {trader.buy_threshold}, Sell: {trader.sell_threshold}, Size: {trader.position_size}")
                 
                 try:
                     buy = input("Buy threshold (default 0.9): ").strip()
@@ -103,27 +111,27 @@ def interactive_mode():
                         position_size=float(size) if size else None
                     )
                 except ValueError:
-                    print("❌ Invalid input, keeping current settings")
+                    logger.error("Invalid input, keeping current settings")
                 
             elif choice == "5":
                 filename = input("Sample data filename (default: sample_data.csv): ").strip()
                 if not filename:
                     filename = "sample_data.csv"
                 create_sample_data(filename)
-                print(f"✅ Created {filename}. You can now load this file with option 1")
+                logger.info(f"Created {filename}. You can now load this file with option 1")
                 
             elif choice == "6":
-                print("👋 Goodbye!")
+                logger.info("Goodbye!")
                 break
                 
             else:
-                print("❌ Invalid choice, try again")
+                logger.error("Invalid choice, try again")
                 
         except KeyboardInterrupt:
-            print("\n👋 Goodbye!")
+            logger.info("\nGoodbye!")
             break
         except Exception as e:
-            print(f"❌ Error: {e}")
+            logger.error(f"Error: {e}")
 
 
 def get_signal(csv_file: str):
@@ -135,10 +143,10 @@ def get_signal(csv_file: str):
         if signal:
             vrp = trader.current_vrp
             state = trader.current_state
-            print(f"\n🎯 SIGNAL: {signal}")
-            print(f"   VRP Ratio: {vrp:.2f}")
-            print(f"   VRP State: {state.name}")
-            print(f"   Position Size: {trader.position_size * 100}%")
+            logger.info(f"\nSIGNAL: {signal}")
+            logger.info(f"   VRP Ratio: {vrp:.2f}")
+            logger.info(f"   VRP State: {state.name}")
+            logger.info(f"   Position Size: {trader.position_size * 100}%")
         return signal
     return None
 
@@ -150,12 +158,12 @@ def run_backtest(csv_file: str):
     if trader.load_data(csv_file):
         results = trader.backtest()
         if results:
-            print(f"\n📈 Backtest Results:")
-            print(f"   Total Return: {results['total_return']:.2%}")
-            print(f"   Win Rate: {results['win_rate']:.1%}")
-            print(f"   Total Trades: {results['total_trades']}")
-            print(f"   Winning Trades: {results['winning_trades']}")
-            print(f"   Losing Trades: {results['losing_trades']}")
+            logger.info(f"\nBacktest Results:")
+            logger.info(f"   Total Return: {results['total_return']:.2%}")
+            logger.info(f"   Win Rate: {results['win_rate']:.1%}")
+            logger.info(f"   Total Trades: {results['total_trades']}")
+            logger.info(f"   Winning Trades: {results['winning_trades']}")
+            logger.info(f"   Losing Trades: {results['losing_trades']}")
         return results
     return None
 
@@ -173,13 +181,13 @@ def main():
     try:
         if args.command == 'signal':
             if not args.csv_file:
-                print("❌ Please specify CSV file: python cli.py signal data.csv")
+                logger.error("Please specify CSV file: python cli.py signal data.csv")
                 return
             get_signal(args.csv_file)
             
         elif args.command == 'backtest':
             if not args.csv_file:
-                print("❌ Please specify CSV file: python cli.py backtest data.csv")
+                logger.error("Please specify CSV file: python cli.py backtest data.csv")
                 return
             run_backtest(args.csv_file)
             
@@ -187,9 +195,9 @@ def main():
             interactive_mode()
             
     except KeyboardInterrupt:
-        print("\n👋 Interrupted by user")
+        logger.info("\nInterrupted by user")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"Error: {e}")
 
 
 if __name__ == "__main__":

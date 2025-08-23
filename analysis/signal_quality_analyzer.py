@@ -401,6 +401,13 @@ class SignalQualityAnalyzer:
 def main():
     """Run signal quality analysis on sample data."""
     
+    # Configure logging to output to console
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(message)s',  # Simple format for analysis output
+        handlers=[logging.StreamHandler()]
+    )
+    
     import csv
     from datetime import date
     from decimal import Decimal
@@ -424,26 +431,28 @@ def main():
     analyzer = SignalQualityAnalyzer()
     report = analyzer.generate_quality_report(data)
     
-    print(report)
+    # Log the detailed report
+    for line in report.split('\n'):
+        logger.info(line)
     
     # Save detailed analysis
     analysis = analyzer.analyze_prediction_accuracy(data)
     
-    # Create summary for team lead
-    print("\n" + "=" * 80)
-    print("EXECUTIVE SUMMARY FOR TECH LEAD")
-    print("=" * 80)
-    print(f"PREDICTION ACCURACY: {analysis['overall_accuracy']:.1%}")
-    print(f"TOTAL PREDICTIONS: {analysis['total_predictions']}")
-    print(f"HIGH CONFIDENCE ACCURACY: {analysis['accuracy_by_confidence']['high']['accuracy']:.1%}")
-    print(f"DIRECTIONAL ACCURACY: {analysis['directional_accuracy']['directional_accuracy']:.1%}")
+    # Log executive summary for tech lead
+    logger.info("=" * 80)
+    logger.info("EXECUTIVE SUMMARY FOR TECH LEAD")
+    logger.info("=" * 80)
+    logger.info(f"PREDICTION ACCURACY: {analysis['overall_accuracy']:.1%}")
+    logger.info(f"TOTAL PREDICTIONS: {analysis['total_predictions']}")
+    logger.info(f"HIGH CONFIDENCE ACCURACY: {analysis['accuracy_by_confidence']['high']['accuracy']:.1%}")
+    logger.info(f"DIRECTIONAL ACCURACY: {analysis['directional_accuracy']['directional_accuracy']:.1%}")
     
     if analysis['overall_accuracy'] < 0.4:
-        print("\nCRITICAL: Prediction accuracy below 40% - Model needs immediate attention")
+        logger.error("CRITICAL: Prediction accuracy below 40% - Model needs immediate attention")
     elif analysis['overall_accuracy'] < 0.5:
-        print("\nWARNING: Prediction accuracy below 50% - Model needs tuning")
+        logger.warning("WARNING: Prediction accuracy below 50% - Model needs tuning")
     else:
-        print("\nACCEPTABLE: Prediction accuracy above 50%")
+        logger.info("ACCEPTABLE: Prediction accuracy above 50%")
 
 
 if __name__ == "__main__":

@@ -270,8 +270,14 @@ def validate_environment_setup() -> None:
 
 
 if __name__ == "__main__":
+    import logging
+    
+    # Configure logging for settings validation
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logger = logging.getLogger(__name__)
+    
     # Validate configuration when run directly
     validate_environment_setup()
-    print("Configuration validated successfully")
-    print(f"Environment: {settings.environment}")
-    print(f"VRP Thresholds: {settings.model.vrp_thresholds}")
+    logger.info("Configuration validated successfully")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"VRP Thresholds: {settings.model.vrp_thresholds}")
