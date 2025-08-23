@@ -14,8 +14,8 @@ from unittest.mock import Mock
 
 from src.config.settings import VRPTradingConfig
 from src.models.data_models import (
-    MarketDataPoint,
-    VolatilityMetrics,
+    MarketData,
+    VolatilityData,
     VRPState,
     TransitionMatrix,
     ModelPrediction,
@@ -99,14 +99,14 @@ def realistic_market_data():
         high_price = spy_price * Decimal(str(1 + abs(daily_return) * 0.5))
         low_price = spy_price * Decimal(str(1 - abs(daily_return) * 0.5))
         
-        point = MarketDataPoint(
+        point = MarketData(
             date=current_date,
-            spy_open=open_price,
-            spy_high=max(high_price, low_price, spy_price),
-            spy_low=min(high_price, low_price, spy_price),
-            spy_close=spy_price,
-            spy_volume=int(np.random.uniform(50_000_000, 150_000_000)),
-            vix_close=vix_value
+            open=open_price,
+            high=max(high_price, low_price, spy_price),
+            low=min(high_price, low_price, spy_price),
+            close=spy_price,
+            volume=int(np.random.uniform(50_000_000, 150_000_000)),
+            iv=vix_value
         )
         
         data.append(point)
@@ -133,9 +133,9 @@ def volatility_metrics_sequence():
         implied_vol = Decimal('0.20')  # Base 20% implied vol
         realized_vol = implied_vol / Decimal(str(vrp))
         
-        metric = VolatilityMetrics(
+        metric = VolatilityData(
             date=base_date + timedelta(days=i),
-            spy_return=Decimal(str(np.random.normal(0.0005, 0.015))),
+            daily_return=Decimal(str(np.random.normal(0.0005, 0.015))),
             realized_vol_30d=realized_vol,
             implied_vol=implied_vol,
             vrp=Decimal(str(vrp)),
@@ -280,38 +280,38 @@ def edge_case_market_data():
     edge_cases = []
     
     # Extreme price movements
-    extreme_crash = MarketDataPoint(
+    extreme_crash = MarketData(
         date=date(2023, 3, 1),
-        spy_open=Decimal('400.0'),
-        spy_high=Decimal('405.0'),
-        spy_low=Decimal('320.0'),  # -20% crash day
-        spy_close=Decimal('325.0'),
-        spy_volume=500_000_000,
-        vix_close=Decimal('80.0')  # VIX spike
+        open=Decimal('400.0'),
+        high=Decimal('405.0'),
+        low=Decimal('320.0'),  # -20% crash day
+        close=Decimal('325.0'),
+        volume=500_000_000,
+        iv=Decimal('80.0')  # IV spike
     )
     edge_cases.append(extreme_crash)
     
     # Minimal price movement
-    flat_day = MarketDataPoint(
+    flat_day = MarketData(
         date=date(2023, 3, 2),
-        spy_open=Decimal('400.0'),
-        spy_high=Decimal('400.01'),
-        spy_low=Decimal('399.99'),
-        spy_close=Decimal('400.0'),
-        spy_volume=10_000_000,
-        vix_close=Decimal('8.0')  # Very low VIX
+        open=Decimal('400.0'),
+        high=Decimal('400.01'),
+        low=Decimal('399.99'),
+        close=Decimal('400.0'),
+        volume=10_000_000,
+        iv=Decimal('8.0')  # Very low IV
     )
     edge_cases.append(flat_day)
     
     # Gap up/down scenarios
-    gap_up = MarketDataPoint(
+    gap_up = MarketData(
         date=date(2023, 3, 3),
-        spy_open=Decimal('440.0'),  # 10% gap up
-        spy_high=Decimal('445.0'),
-        spy_low=Decimal('435.0'),
-        spy_close=Decimal('442.0'),
-        spy_volume=200_000_000,
-        vix_close=Decimal('15.0')
+        open=Decimal('440.0'),  # 10% gap up
+        high=Decimal('445.0'),
+        low=Decimal('435.0'),
+        close=Decimal('442.0'),
+        volume=200_000_000,
+        iv=Decimal('15.0')
     )
     edge_cases.append(gap_up)
     
@@ -325,14 +325,14 @@ def invalid_market_data():
     
     # Negative prices
     try:
-        negative_price = MarketDataPoint(
+        negative_price = MarketData(
             date=date(2023, 3, 1),
-            spy_open=Decimal('-400.0'),
-            spy_high=Decimal('405.0'),
-            spy_low=Decimal('395.0'),
-            spy_close=Decimal('400.0'),
-            spy_volume=1_000_000,
-            vix_close=Decimal('20.0')
+            open=Decimal('-400.0'),
+            high=Decimal('405.0'),
+            low=Decimal('395.0'),
+            close=Decimal('400.0'),
+            volume=1_000_000,
+            iv=Decimal('20.0')
         )
         invalid_cases.append(negative_price)
     except Exception:
@@ -340,14 +340,14 @@ def invalid_market_data():
     
     # High < Low (impossible)
     try:
-        impossible_ohlc = MarketDataPoint(
+        impossible_ohlc = MarketData(
             date=date(2023, 3, 2),
-            spy_open=Decimal('400.0'),
-            spy_high=Decimal('395.0'),  # High < Low
-            spy_low=Decimal('405.0'),
-            spy_close=Decimal('400.0'),
-            spy_volume=1_000_000,
-            vix_close=Decimal('20.0')
+            open=Decimal('400.0'),
+            high=Decimal('395.0'),  # High < Low
+            low=Decimal('405.0'),
+            close=Decimal('400.0'),
+            volume=1_000_000,
+            iv=Decimal('20.0')
         )
         invalid_cases.append(impossible_ohlc)
     except Exception:
@@ -375,14 +375,14 @@ def performance_test_data():
         spy_price = spy_price * (1 + Decimal(str(daily_return)))
         vix_value = max(Decimal('8.0'), vix_value * (1 + Decimal(str(vix_change))))
         
-        point = MarketDataPoint(
+        point = MarketData(
             date=base_date + timedelta(days=i),
-            spy_open=spy_price * Decimal('0.999'),
-            spy_high=spy_price * Decimal('1.01'),
-            spy_low=spy_price * Decimal('0.99'),
-            spy_close=spy_price,
-            spy_volume=int(np.random.uniform(80_000_000, 120_000_000)),
-            vix_close=vix_value
+            open=spy_price * Decimal('0.999'),
+            high=spy_price * Decimal('1.01'),
+            low=spy_price * Decimal('0.99'),
+            close=spy_price,
+            volume=int(np.random.uniform(80_000_000, 120_000_000)),
+            iv=vix_value
         )
         
         data.append(point)

@@ -66,7 +66,7 @@ class VRPTrader:
         """
         Load market data from CSV file or DataFrame.
         
-        Expected columns: date, spy_open, spy_high, spy_low, spy_close, spy_volume, vix_close
+        Expected columns: date, open, high, low, close, volume, iv
         
         Args:
             data_source: CSV file path or pandas DataFrame
@@ -89,7 +89,7 @@ class VRPTrader:
                 return False
             
             # Validate required columns
-            required_cols = ['date', 'spy_open', 'spy_high', 'spy_low', 'spy_close', 'spy_volume', 'vix_close']
+            required_cols = ['date', 'open', 'high', 'low', 'close', 'volume', 'iv']
             missing_cols = [col for col in required_cols if col not in df.columns]
             
             if missing_cols:
@@ -105,12 +105,12 @@ class VRPTrader:
                 try:
                     market_data = MarketData(
                         date=row['date'],
-                        spy_open=Decimal(str(row['spy_open'])),
-                        spy_high=Decimal(str(row['spy_high'])),
-                        spy_low=Decimal(str(row['spy_low'])),
-                        spy_close=Decimal(str(row['spy_close'])),
-                        spy_volume=int(row['spy_volume']),
-                        vix_close=Decimal(str(row['vix_close']))
+                        open=Decimal(str(row['open'])),
+                        high=Decimal(str(row['high'])),
+                        low=Decimal(str(row['low'])),
+                        close=Decimal(str(row['close'])),
+                        volume=int(row['volume']),
+                        iv=Decimal(str(row['iv']))
                     )
                     validated_data.append(market_data)
                 except (ValueError, TypeError) as e:
@@ -252,33 +252,53 @@ class VRPTrader:
 
 
 def create_sample_data(filename: str = "sample_data.csv"):
-    """Create sample CSV file for testing."""
+    """Create realistic sample CSV file for VRP analysis testing."""
     dates = pd.date_range('2023-01-01', '2024-01-01', freq='D')
     
-    # Generate realistic sample data
+    # Generate REALISTIC market data for VRP analysis
     np.random.seed(42)
-    spy_prices = 400 + np.cumsum(np.random.randn(len(dates)) * 0.5)
-    vix_values = 15 + np.abs(np.random.randn(len(dates)) * 3)
     
     data = []
+    base_price = 400.0
+    base_iv = 20.0
+    
     for i, date in enumerate(dates):
         if i == 0:
             continue
             
-        spy_open = spy_prices[i] + np.random.randn() * 0.5
-        spy_close = spy_prices[i]
-        spy_high = max(spy_open, spy_close) + abs(np.random.randn() * 0.3)
-        spy_low = min(spy_open, spy_close) - abs(np.random.randn() * 0.3)
+        # Create realistic daily returns (mean-reverting with occasional spikes)
+        if np.random.random() < 0.05:  # 5% chance of large move
+            daily_return = np.random.normal(0, 0.03)  # 3% volatility spike
+        else:
+            daily_return = np.random.normal(0.0005, 0.015)  # Normal 1.5% daily vol
+            
+        # Update price with realistic movement
+        new_price = base_price * (1 + daily_return)
+        
+        # Create realistic OHLC
+        open_price = base_price + np.random.normal(0, base_price * 0.002)
+        close_price = new_price
+        high_price = max(open_price, close_price) + abs(np.random.normal(0, base_price * 0.003))
+        low_price = min(open_price, close_price) - abs(np.random.normal(0, base_price * 0.003))
+        
+        # Create realistic IV that correlates with market stress
+        # IV tends to spike when prices drop (inverse correlation)
+        iv_change = -daily_return * 2 + np.random.normal(0, 0.02)  # Inverse correlation + noise
+        new_iv = max(8.0, min(50.0, base_iv * (1 + iv_change)))  # Bound between 8-50%
         
         data.append({
             'date': date.strftime('%Y-%m-%d'),
-            'spy_open': round(spy_open, 2),
-            'spy_high': round(spy_high, 2),
-            'spy_low': round(spy_low, 2),
-            'spy_close': round(spy_close, 2),
-            'spy_volume': int(80_000_000 + np.random.randn() * 20_000_000),
-            'vix_close': round(vix_values[i], 2)
+            'open': round(open_price, 2),
+            'high': round(high_price, 2),
+            'low': round(low_price, 2),
+            'close': round(close_price, 2),
+            'volume': int(np.random.uniform(60_000_000, 120_000_000)),
+            'iv': round(new_iv, 2)
         })
+        
+        # Update base values for next iteration
+        base_price = new_price
+        base_iv = new_iv
     
     df = pd.DataFrame(data)
     df.to_csv(filename, index=False)

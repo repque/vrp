@@ -93,35 +93,35 @@ class TestRunner:
         
         data = MarketData(
             date=datetime(2023, 1, 1),
-            spy_open=400.0,
-            spy_high=405.0,
-            spy_low=395.0,
-            spy_close=402.0,
-            spy_volume=100_000_000,
-            vix_close=20.0
+            open=400.0,
+            high=405.0,
+            low=395.0,
+            close=402.0,
+            volume=100_000_000,
+            iv=20.0
         )
         
         self.assert_equal(data.date, date(2023, 1, 1))
-        self.assert_equal(data.spy_open, Decimal('400.0'))
-        self.assert_equal(data.spy_high, Decimal('405.0'))
-        self.assert_equal(data.spy_low, Decimal('395.0'))
-        self.assert_equal(data.spy_close, Decimal('402.0'))
-        self.assert_equal(data.spy_volume, 100_000_000)
-        self.assert_equal(data.vix_close, Decimal('20.0'))
+        self.assert_equal(data.open, Decimal('400.0'))
+        self.assert_equal(data.high, Decimal('405.0'))
+        self.assert_equal(data.low, Decimal('395.0'))
+        self.assert_equal(data.close, Decimal('402.0'))
+        self.assert_equal(data.volume, 100_000_000)
+        self.assert_equal(data.iv, Decimal('20.0'))
 
     def test_negative_prices_validation(self):
         """Test that negative prices are rejected."""
         print("Testing negative prices validation...")
         
         def create_negative_price_data():
-            return MarketDataPoint(
+            return MarketData(
                 date=date(2023, 1, 1),
-                spy_open=Decimal('-400.0'),
-                spy_high=Decimal('405.0'),
-                spy_low=Decimal('395.0'),
-                spy_close=Decimal('402.0'),
-                spy_volume=100_000_000,
-                vix_close=Decimal('20.0')
+                open=Decimal('-400.0'),
+                high=Decimal('405.0'),
+                low=Decimal('395.0'),
+                close=Decimal('402.0'),
+                volume=100_000_000,
+                iv=Decimal('20.0')
             )
         
         self.assert_raises(ValidationError, create_negative_price_data, "must be positive")
@@ -130,9 +130,9 @@ class TestRunner:
         """Test creation of valid volatility metrics."""
         print("Testing valid volatility metrics...")
         
-        metrics = VolatilityMetrics(
+        metrics = VolatilityData(
             date=date(2023, 1, 1),
-            spy_return=Decimal('0.015'),
+            daily_return=Decimal('0.015'),
             realized_vol_30d=Decimal('0.20'),
             implied_vol=Decimal('0.25'),
             vrp=Decimal('1.25'),
@@ -140,7 +140,7 @@ class TestRunner:
         )
         
         self.assert_equal(metrics.date, date(2023, 1, 1))
-        self.assert_equal(metrics.spy_return, Decimal('0.015'))
+        self.assert_equal(metrics.daily_return, Decimal('0.015'))
         self.assert_equal(metrics.realized_vol_30d, Decimal('0.20'))
         self.assert_equal(metrics.implied_vol, Decimal('0.25'))
         self.assert_equal(metrics.vrp, Decimal('1.25'))

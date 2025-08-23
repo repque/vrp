@@ -20,7 +20,7 @@ from .constants import (
 class PriceValidationMixin:
     """Mixin for price field validation logic."""
     
-    @field_validator('spy_open', 'spy_high', 'spy_low', 'spy_close', 'vix_close', mode='before')
+    @field_validator('open', 'high', 'low', 'close', 'iv', mode='before')
     @classmethod
     def validate_positive_prices(cls, v: Union[float, Decimal], info) -> Decimal:
         """Ensure price fields are positive with descriptive errors."""
@@ -52,7 +52,7 @@ class PriceValidationMixin:
 class VolumeValidationMixin:
     """Mixin for volume field validation logic."""
     
-    @field_validator('spy_volume', mode='before')
+    @field_validator('volume', mode='before')
     @classmethod
     def validate_volume(cls, v: int, info) -> int:
         """Ensure volume is non-negative and within reasonable bounds."""

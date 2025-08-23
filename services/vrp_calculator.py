@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from src.models.data_models import MarketData, VRPState, VolatilityData
 from src.models.constants import DefaultConfiguration
+from src.services.vrp_classifier import VRPClassifier
 from src.utils.exceptions import CalculationError, InsufficientDataError
 
 logger = logging.getLogger(__name__)
@@ -34,8 +35,9 @@ class VRPCalculator:
         """
         self.config = config or DefaultConfiguration()
         self.trading_days_per_year = self.config.VOLATILITY_ANNUALIZATION_FACTOR
+        self.vrp_classifier = VRPClassifier()
         
-        logger.info("VRPCalculator initialized for VolatilityData generation")
+        logger.info("VRPCalculator initialized with adaptive VRP classification")
     
     def generate_volatility_data(self, data: List[MarketData]) -> List[VolatilityData]:
         """
@@ -59,21 +61,24 @@ class VRPCalculator:
         
         volatility_data = []
         
+        # Pre-calculate all returns for vectorized operations
+        closes = [float(d.close) for d in data]
+        returns = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes))]
+        
         # Start from day 30 to have enough data for 30-day realized volatility
         for i in range(30, len(data)):
             try:
                 current_date = data[i].date
                 
-                # Calculate daily return
-                prev_close = float(data[i-1].spy_close)
-                curr_close = float(data[i].spy_close)
-                daily_return = Decimal(str((curr_close - prev_close) / prev_close))
+                # Get pre-calculated daily return
+                daily_return = Decimal(str(returns[i-1]))  # returns is 0-indexed from day 1
                 
-                # Calculate 30-day realized volatility
-                realized_vol = self._calculate_rolling_volatility(data[i-29:i+1])
+                # Calculate 30-day realized volatility using cached returns
+                window_returns = returns[i-30:i]  # Last 30 returns
+                realized_vol = self._calculate_volatility_from_returns(window_returns)
                 
-                # Get implied volatility
-                implied_vol = Decimal(str(float(data[i].vix_close) / 100))
+                # Get implied volatility (cache division by 100)
+                implied_vol = Decimal(str(float(data[i].iv) * 0.01))
                 
                 # Calculate VRP ratio
                 if realized_vol <= 0:
@@ -82,13 +87,13 @@ class VRPCalculator:
                 
                 vrp_ratio = implied_vol / realized_vol
                 
-                # Classify VRP state
-                vrp_state = self._classify_vrp_state(float(vrp_ratio))
+                # Classify VRP state using adaptive quantile-based classifier
+                vrp_state = self.vrp_classifier.classify_vrp_state(float(vrp_ratio))
                 
                 # Create VolatilityData object
                 vol_data = VolatilityData(
                     date=current_date,
-                    spy_return=daily_return,
+                    daily_return=daily_return,
                     realized_vol_30d=realized_vol,
                     implied_vol=implied_vol,
                     vrp=vrp_ratio,
@@ -119,8 +124,8 @@ class VRPCalculator:
         """
         returns = []
         for i in range(1, len(data_window)):
-            prev_close = float(data_window[i-1].spy_close)
-            curr_close = float(data_window[i].spy_close)
+            prev_close = float(data_window[i-1].close)
+            curr_close = float(data_window[i].close)
             daily_return = (curr_close - prev_close) / prev_close
             returns.append(daily_return)
         
@@ -130,28 +135,23 @@ class VRPCalculator:
         volatility = np.std(returns) * np.sqrt(self.trading_days_per_year)
         return Decimal(str(volatility))
     
-    def _classify_vrp_state(self, vrp_ratio: float) -> VRPState:
+    def _calculate_volatility_from_returns(self, returns: List[float]) -> Decimal:
         """
-        Classify VRP ratio into discrete states for Markov chain.
+        Optimized volatility calculation from pre-computed returns.
         
         Args:
-            vrp_ratio: The VRP ratio to classify
+            returns: List of daily returns
             
         Returns:
-            VRP state classification
+            Annualized realized volatility
         """
-        config = self.config
+        if not returns:
+            return Decimal('0')
         
-        if vrp_ratio < float(config.VRP_UNDERPRICED_THRESHOLD):
-            return VRPState.EXTREME_LOW
-        elif vrp_ratio < float(config.VRP_FAIR_UPPER_THRESHOLD):
-            return VRPState.FAIR_VALUE
-        elif vrp_ratio < float(config.VRP_NORMAL_UPPER_THRESHOLD):
-            return VRPState.NORMAL_PREMIUM
-        elif vrp_ratio < float(config.VRP_ELEVATED_UPPER_THRESHOLD):
-            return VRPState.ELEVATED_PREMIUM
-        else:
-            return VRPState.EXTREME_HIGH
+        # Use numpy for efficient calculation
+        volatility = np.std(returns, ddof=1) * np.sqrt(self.trading_days_per_year)
+        return Decimal(str(volatility))
+    
     
     def get_current_vrp_state(self, data: List[MarketData]) -> VRPState:
         """

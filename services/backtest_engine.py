@@ -12,6 +12,7 @@ from datetime import datetime, date
 
 from src.models.data_models import MarketData
 from src.utils.exceptions import InsufficientDataError, CalculationError, ModelStateError
+from src.utils.temporal_validation import validate_trading_decision_temporal_integrity
 from .vrp_calculator import VRPCalculator
 from .signal_generator import SignalGenerator
 
@@ -153,16 +154,23 @@ class BacktestEngine:
         
         # Start after minimum required period
         for i in range(min_data_required, len(data)):
-            # Get historical data up to current point for predictive modeling
-            # Use larger window for better Markov chain predictions
-            historical_data = data[max(0, i-200):i+1]
-            
             try:
+                # CRITICAL: Only use data available up to current point (no forward-looking)
+                # Use larger window for better Markov chain predictions, but ONLY historical data
+                historical_data = data[max(0, i-200):i+1]  # Up to and including current day
+                
                 # Generate volatility data for Markov chain processing
+                # This ensures no future data leakage in calculations
                 volatility_data = self.calculator.generate_volatility_data(historical_data)
                 
                 if len(volatility_data) < 60:  # Need minimum data for transition matrix
                     continue
+                
+                # CRITICAL: Validate no forward-looking bias before trading decision
+                current_decision_date = data[i].date
+                validate_trading_decision_temporal_integrity(
+                    current_decision_date, historical_data, volatility_data
+                )
                     
                 # Generate predictive signal using Markov chain model
                 trading_signal = self.signal_generator.generate_signal(volatility_data)
@@ -253,16 +261,16 @@ class BacktestEngine:
             P&L for the trade
         """
         try:
-            # Simplified P&L calculation using VIX change
+            # Simplified P&L calculation using IV change
             # In practice, this would use actual option or ETF prices
-            vix_change = (
-                float(curr_data.vix_close) - float(prev_data.vix_close)
-            ) / float(prev_data.vix_close)
+            iv_change = (
+                float(curr_data.iv) - float(prev_data.iv)
+            ) / float(prev_data.iv)
             
-            # Volatility positions have inverse relationship with VIX
-            # (buying vol benefits from VIX increase)
+            # Volatility positions have inverse relationship with IV
+            # (buying vol benefits from IV increase)
             effective_position = (old_position + new_position) / 2
-            pnl = effective_position * vix_change
+            pnl = effective_position * iv_change
             
             return pnl
             

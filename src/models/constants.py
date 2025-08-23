@@ -40,13 +40,8 @@ class BusinessConstants:
     # Valid alert levels for system monitoring
     ALERT_LEVELS: List[str] = ["GREEN", "YELLOW", "RED"]
     
-    # VRP state boundaries (default thresholds)
-    VRP_THRESHOLDS = {
-        'underpriced': Decimal('0.90'),
-        'fair_upper': Decimal('1.10'), 
-        'normal_upper': Decimal('1.30'),
-        'elevated_upper': Decimal('1.50')
-    }
+    # VRP quantile boundaries for adaptive state classification
+    VRP_QUANTILE_BOUNDS = [0.1, 0.3, 0.7, 0.9]  # Percentile-based state boundaries
     
     # Position sizing constraints
     MIN_POSITION_SIZE = Decimal('0.0')
@@ -74,11 +69,8 @@ class DefaultConfiguration:
     # Volatility calculation constants
     VOLATILITY_ANNUALIZATION_FACTOR = 252  # Trading days per year for volatility annualization
     
-    # VRP classification thresholds - converted from settings.py list format
-    VRP_UNDERPRICED_THRESHOLD = BusinessConstants.VRP_THRESHOLDS['underpriced']
-    VRP_FAIR_UPPER_THRESHOLD = BusinessConstants.VRP_THRESHOLDS['fair_upper']
-    VRP_NORMAL_UPPER_THRESHOLD = BusinessConstants.VRP_THRESHOLDS['normal_upper']
-    VRP_ELEVATED_UPPER_THRESHOLD = BusinessConstants.VRP_THRESHOLDS['elevated_upper']
+    # VRP adaptive classification - quantile-based boundaries
+    VRP_QUANTILE_BOUNDS = BusinessConstants.VRP_QUANTILE_BOUNDS
     
     # Model parameters - synchronized with settings.py
     LAPLACE_SMOOTHING_ALPHA = Decimal('1.0')  # Matches settings.py default
@@ -152,52 +144,3 @@ class FieldNames:
     RISK_ADJUSTED_SIZE = "risk adjusted position size"
 
 
-def validate_vrp_threshold_order(thresholds: dict) -> bool:
-    """
-    Validate that VRP thresholds are in ascending order.
-    
-    Args:
-        thresholds: Dictionary of threshold values
-        
-    Returns:
-        bool: True if thresholds are properly ordered
-        
-    Raises:
-        ValueError: If thresholds are not in ascending order
-    """
-    threshold_list = [
-        thresholds['underpriced'],
-        thresholds['fair_upper'], 
-        thresholds['normal_upper'],
-        thresholds['elevated_upper']
-    ]
-    
-    for i in range(len(threshold_list) - 1):
-        if threshold_list[i] >= threshold_list[i + 1]:
-            raise ValueError(ErrorMessages.THRESHOLD_ORDER_INVALID)
-    
-    return True
-
-
-def get_vrp_state_ranges(thresholds: dict = None) -> List[Tuple[Decimal, Decimal]]:
-    """
-    Get VRP state ranges based on threshold configuration.
-    
-    Args:
-        thresholds: Optional custom thresholds, defaults to business constants
-        
-    Returns:
-        List of (min, max) tuples for each VRP state
-    """
-    if thresholds is None:
-        thresholds = BusinessConstants.VRP_THRESHOLDS
-    
-    validate_vrp_threshold_order(thresholds)
-    
-    return [
-        (Decimal('0'), thresholds['underpriced']),  # EXTREME_LOW
-        (thresholds['underpriced'], thresholds['fair_upper']),  # FAIR_VALUE
-        (thresholds['fair_upper'], thresholds['normal_upper']),  # NORMAL_PREMIUM
-        (thresholds['normal_upper'], thresholds['elevated_upper']),  # ELEVATED_PREMIUM
-        (thresholds['elevated_upper'], Decimal('999')),  # EXTREME_HIGH
-    ]

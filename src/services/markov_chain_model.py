@@ -33,6 +33,11 @@ class MarkovChainModel(IMarkovChainModel):
         self.settings = get_settings()
         self.num_states = 5  # VRP has 5 states
         
+        # Cache for transition matrices to avoid recalculation
+        self._matrix_cache = {}
+        self._cache_hit_count = 0
+        self._cache_miss_count = 0
+        
         logger.info("Markov Chain Model initialized")
     
     def update_transition_matrix(
@@ -70,6 +75,16 @@ class MarkovChainModel(IMarkovChainModel):
             # Use the most recent window_days of data
             recent_data = sorted_data[-window_days:]
             
+            # Create cache key based on recent data hash
+            cache_key = self._create_cache_key(recent_data)
+            
+            # Check cache first
+            if cache_key in self._matrix_cache:
+                self._cache_hit_count += 1
+                return self._matrix_cache[cache_key]
+            
+            self._cache_miss_count += 1
+            
             # Count transitions
             transition_counts = self._count_transitions(recent_data)
             
@@ -88,8 +103,17 @@ class MarkovChainModel(IMarkovChainModel):
                 window_end=recent_data[-1].date
             )
             
+            # Cache the result
+            self._matrix_cache[cache_key] = transition_matrix
+            
+            # Limit cache size to prevent memory issues
+            if len(self._matrix_cache) > 100:
+                # Remove oldest entries (simple FIFO)
+                oldest_key = next(iter(self._matrix_cache))
+                del self._matrix_cache[oldest_key]
+            
             logger.info(f"Updated transition matrix with {len(recent_data)} observations")
-            logger.debug(f"Window: {recent_data[0].date} to {recent_data[-1].date}")
+            logger.debug(f"Cache stats: {self._cache_hit_count} hits, {self._cache_miss_count} misses")
             
             return transition_matrix
             
@@ -272,6 +296,24 @@ class MarkovChainModel(IMarkovChainModel):
                     
         except Exception as e:
             raise ModelStateError(f"Invalid transition matrix: {str(e)}")
+    
+    def _create_cache_key(self, volatility_data: List[VolatilityData]) -> str:
+        """
+        Create cache key based on volatility data sequence.
+        
+        Args:
+            volatility_data: Recent volatility data for caching
+            
+        Returns:
+            String cache key
+        """
+        # Create hash of state sequence and dates for efficient caching
+        state_sequence = [d.vrp_state.value for d in volatility_data]
+        date_sequence = [d.date.isoformat() for d in volatility_data[:5]]  # First 5 dates
+        
+        # Combine for unique identifier
+        key_data = f"{state_sequence}-{date_sequence}"
+        return str(hash(key_data))
     
     def calculate_steady_state_distribution(
         self, 

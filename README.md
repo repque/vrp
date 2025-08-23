@@ -1,42 +1,51 @@
 # VRP Trading System
 
-A volatility risk premium (VRP) trading system that uses Markov chain state transitions to generate predictive buy/sell signals from CSV market data.
+A volatility risk premium (VRP) trading system that uses adaptive Markov chain state transitions to generate predictive trading signals. The system processes CSV market data and provides buy/sell/hold recommendations based on quantile-based VRP state classification.
 
-## 🚀 Quick Start (2 Steps)
+## Quick Start
 
-### 1. Install Dependencies
+### Install Dependencies
 ```bash
 pip install pandas numpy pydantic pydantic-settings
 ```
 
-### 2. Run the System
+### Run the System
 ```bash
-python vrp.py     # Creates sample data and shows example
-python cli.py     # Interactive mode
+# Generate sample data and show example signal
+python vrp.py
+
+# Run backtest
+python vrp.py --backtest
+
+# Interactive CLI
+python cli.py
 ```
 
-## 📊 What is VRP?
+## What is VRP?
 
 **VRP (Volatility Risk Premium)** = Implied Volatility ÷ Realized Volatility
 
-The system uses Markov chain models to predict VRP state transitions:
+The system uses adaptive quantile-based classification to categorize VRP states:
+- **EXTREME_LOW**: ≤ 10th percentile (undervalued volatility)
+- **FAIR_VALUE**: 10th-30th percentile (slightly undervalued)
+- **NORMAL_PREMIUM**: 30th-70th percentile (normal range)
+- **ELEVATED_PREMIUM**: 70th-90th percentile (overvalued)
+- **EXTREME_HIGH**: > 90th percentile (extremely overvalued)
 
-- **VRP States**: EXTREME_LOW, FAIR_VALUE, NORMAL_PREMIUM, ELEVATED_PREMIUM, EXTREME_HIGH
-- **Signal Generation**: Based on predicted state probabilities and confidence scoring
-- **Position Sizing**: Risk-adjusted based on model confidence
+## CSV Data Format
 
-## 📄 CSV Data Format
-
-Your CSV file needs these columns:
+Required columns:
 ```csv
-date,spy_open,spy_high,spy_low,spy_close,spy_volume,vix_close
-2024-01-15,480.50,482.75,479.25,481.80,85000000,16.25
-2024-01-16,481.90,483.40,480.10,482.60,78000000,15.90
+date,open,high,low,close,volume,iv
+2024-01-15,480.50,482.75,479.25,481.80,85000000,0.1625
+2024-01-16,481.90,483.40,480.10,482.60,78000000,0.1590
 ```
 
-## 💻 Simple Usage
+Note: The system uses generic OHLCV+IV format (not asset-specific). IV should be provided as decimal (0.16 = 16%).
 
-### Python API (3 lines)
+## Basic Usage
+
+### Python API
 ```python
 from vrp import VRPTrader
 
@@ -50,11 +59,8 @@ signal = trader.get_signal()  # Returns "BUY_VOL", "SELL_VOL", or "HOLD"
 # Get current signal
 python cli.py signal data.csv
 
-# Run backtest  
+# Run backtest
 python cli.py backtest data.csv
-
-# Interactive mode
-python cli.py
 ```
 
 ### DataFrame Input
@@ -62,162 +68,150 @@ python cli.py
 import pandas as pd
 from vrp import VRPTrader
 
-# Load your data however you want
 df = pd.read_csv('market_data.csv')
-# or df = get_data_from_database()
-# or df = download_from_api()
-
 trader = VRPTrader()
-trader.load_data(df)  # Pass DataFrame directly
+trader.load_data(df)
 signal = trader.get_signal()
 ```
 
-## 📈 Example Output
+## Example Output
 
 ```
-Generated predictive signal: SELL_VOL | 
-Current: EXTREME_HIGH | 
-Predicted: EXTREME_HIGH | 
-Confidence: 88.0% | 
-Reason: Model predicts 95.3% probability of overvalued VRP states
+Generated predictive signal: BUY_VOL | 
+Current: ELEVATED_PREMIUM | 
+Predicted: ELEVATED_PREMIUM | 
+Confidence: 0.832 | 
+Reason: Model predicts 80.0% probability of overvalued VRP states - buy for mean reversion
 ```
 
 The system provides:
-- Current VRP state classification
+- Current VRP state classification using adaptive quantiles
 - Predicted next state using Markov chain transitions
-- Model confidence score (0-100%)
+- Model confidence score (0.0-1.0)
 - Clear reasoning for signal decisions
 
-## 📈 Advanced Signal Details
+## Detailed Signal Information
 
 ```python
-# Get detailed signal information
 signal_details = trader.get_trading_signal_details()
 
 print(f"Signal: {signal_details.signal_type}")
 print(f"Current State: {signal_details.current_state.name}")
 print(f"Predicted State: {signal_details.predicted_state.name}")
-print(f"Confidence: {signal_details.confidence_score:.1%}")
+print(f"Confidence: {signal_details.confidence_score:.3f}")
 print(f"Position Size: {signal_details.risk_adjusted_size:.1%}")
 print(f"Reasoning: {signal_details.reason}")
 ```
 
-## 📈 Backtesting
+## Backtesting
 
 ```python
-# Backtest entire dataset
+# Run backtest on entire dataset
 results = trader.backtest()
-
-# Backtest specific period
-results = trader.backtest(
-    start_date='2023-06-01',
-    end_date='2023-12-31'
-)
 
 print(f"Win Rate: {results['win_rate']:.1%}")
 print(f"Total Return: {results['total_return']:.2%}")
+print(f"Sharpe Ratio: {results['sharpe_ratio']:.3f}")
+print(f"Max Drawdown: {results['max_drawdown']:.2%}")
 ```
 
-*Note: Backtest functionality is temporarily disabled pending API updates.*
-
-## 🛠 Getting Your Data
-
-The system is designed to work with CSV files for maximum flexibility and reliability. Here are your data options:
-
-### Option 1: Use the sample generator
-```python
-from vrp import create_sample_data
-create_sample_data('my_data.csv')  # Creates realistic sample data
-```
-
-### Option 2: Download data yourself (optional)
-If you want to download live data, you can use any data provider:
-
-```python
-# Example with any data source
-import pandas as pd
-
-# Get data from your preferred source
-# (Yahoo Finance, Alpha Vantage, Bloomberg API, etc.)
-spy_data = get_spy_data()  # Your data source
-vix_data = get_vix_data()  # Your data source
-
-# Format and save
-data = pd.DataFrame({
-    'date': spy_data.index,
-    'spy_open': spy_data['Open'],
-    'spy_high': spy_data['High'], 
-    'spy_low': spy_data['Low'],
-    'spy_close': spy_data['Close'],
-    'spy_volume': spy_data['Volume'],
-    'vix_close': vix_data['Close']
-})
-data.to_csv('market_data.csv', index=False)
-```
-
-### Option 3: Use your own data source
-As long as you have the required columns in CSV format, you can use any data source.
-
-## 📋 Architecture
-
-The system uses predictive modeling with Markov chain state transitions:
+## Architecture
 
 ```
 vrp/
-├── vrp.py                           # Main VRP trading system (simple interface)
-├── cli.py                           # Command-line interface  
+├── vrp.py                           # Main trading system entry point
+├── cli.py                           # Command-line interface
 ├── services/                        # Core trading services
-│   ├── vrp_calculator.py           # VolatilityData generation for Markov chain
-│   ├── signal_generator.py         # Predictive signal generation 
-│   └── backtest_engine.py          # Strategy backtesting
+│   ├── vrp_calculator.py           # VRP calculation and volatility data generation
+│   ├── signal_generator.py         # Predictive signal generation
+│   └── backtest_engine.py          # Strategy backtesting with temporal validation
 ├── src/
 │   ├── services/
-│   │   └── markov_chain_model.py   # Transition matrix and state predictions
+│   │   ├── markov_chain_model.py   # Transition matrix and state predictions
+│   │   └── vrp_classifier.py       # Adaptive quantile-based state classification
 │   ├── models/                     # Data models and validation
 │   │   ├── data_models.py          # Pydantic models with business rules
-│   │   ├── constants.py            # Centralized configuration
+│   │   ├── constants.py            # System constants and configuration
 │   │   └── validators.py           # Reusable validation logic
-│   └── interfaces/
-│       └── contracts.py            # Service interface definitions
-└── README.md                       # This file
+│   ├── interfaces/
+│   │   └── contracts.py            # Service interface definitions
+│   └── utils/
+│       ├── exceptions.py           # Custom exception classes
+│       └── temporal_validation.py  # Forward-looking bias prevention
+└── analysis/
+    └── signal_quality_analyzer.py  # Prediction accuracy analysis tools
 ```
 
-**Key Features:**
-- Markov chain state transition modeling for prediction
-- Multi-factor confidence scoring (entropy + data quality + stability)  
-- Risk-adjusted position sizing based on model confidence
-- Comprehensive error handling and data validation
-- Simple 3-line API maintained for ease of use
+## How the System Works
 
-## 🧠 How Prediction Works
+### 1. Adaptive State Classification
+- Uses rolling 252-day window to calculate quantile boundaries
+- Boundaries adapt to changing market conditions
+- No fixed thresholds - fully data-driven classification
 
-1. **State Classification**: VRP ratios are classified into 5 discrete states
-2. **Transition Matrix**: Built from historical state transitions using 60-day rolling windows
-3. **Laplace Smoothing**: Applied to handle sparse transition data
-4. **State Prediction**: Next state probabilities calculated from current state
-5. **Signal Generation**: Signals generated based on predicted state probabilities:
-   - **BUY_VOL**: >60% probability of undervalued states
-   - **SELL_VOL**: >60% probability of overvalued states  
-   - **HOLD**: Balanced or uncertain probabilities
+### 2. Markov Chain Modeling
+- Builds transition matrix from 60-day rolling windows
+- Applies Laplace smoothing for robust predictions
+- Calculates next-state probabilities from current state
 
-## 🎯 Trading Implementation
+### 3. Signal Generation
+- **BUY_VOL**: Model predicts movement to overvalued states (profit from mean reversion)
+- **SELL_VOL**: Model predicts movement to undervalued states (profit from mean reversion)
+- **HOLD**: Balanced or uncertain state probabilities
 
-When you get a signal, here's how to trade it:
+### 4. Confidence Scoring
+- Entropy-based prediction confidence
+- Data quality assessment
+- Model stability metrics
+- Combined into overall confidence score
+
+### 5. Risk Management
+- Position sizing based on signal strength and confidence
+- Maximum position limits
+- Drawdown monitoring
+
+## Performance Metrics
+
+The system tracks comprehensive performance metrics:
+- **Win Rate**: Percentage of profitable trades
+- **Profit Factor**: Ratio of profits to losses
+- **Sharpe Ratio**: Risk-adjusted return measure
+- **Maximum Drawdown**: Largest peak-to-trough decline
+- **Average Trade Return**: Mean return per trade
+- **Prediction Accuracy**: State transition prediction hit rate
+
+## Key Features
+
+- **Threshold-Free Operation**: Uses adaptive quantile-based classification
+- **Forward-Looking Bias Prevention**: Temporal validation ensures realistic backtests
+- **High Prediction Accuracy**: State transition prediction with confidence scoring
+- **Risk-Adjusted Sizing**: Position sizes based on model confidence
+- **Comprehensive Validation**: Extensive data validation and error handling
+- **Asset Agnostic**: Works with any OHLCV+IV data (not limited to SPY/VIX)
+
+## Trading Implementation
 
 ### BUY_VOL Signal
 - Buy VIX call options
-- Long UVXY, VXX (volatility ETFs)
-- Short SVXY, XIV (inverse vol ETFs)
+- Long volatility ETFs (UVXY, VXX)
+- Short inverse volatility ETFs (SVXY)
 
 ### SELL_VOL Signal
 - Sell VIX calls / Buy VIX puts
-- Short UVXY, VXX 
-- Long SVXY, XIV
+- Short volatility ETFs (UVXY, VXX)
+- Long inverse volatility ETFs (SVXY)
 
-## ⚠️ Disclaimer
+### HOLD Signal
+- No position changes
+- Wait for clearer directional signals
 
-Educational use only. Do your own research and manage your risk appropriately.
+## System Requirements
 
----
+- Python 3.8+
+- pandas, numpy, pydantic
+- Minimum 90 days of historical data (30 for volatility calculation + 60 for Markov modeling)
+- CSV format with OHLCV+IV columns
 
-**Production-ready predictive VRP trading system** 📈
+## Disclaimer
+
+This software is for educational and research purposes only. It does not constitute investment advice. Trading involves substantial risk of loss. Users should conduct their own research and consult with financial advisors before making investment decisions.

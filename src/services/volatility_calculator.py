@@ -177,12 +177,12 @@ class VolatilityCalculator(IVolatilityCalculator):
             vix_data = {}
             
             for data in market_data:
-                # Assume SPY data has volume, VIX data does not
-                if hasattr(data, 'spy_volume') and data.spy_volume > 0:
+                # All data has both volume and iv in generic schema
+                if hasattr(data, 'volume') and data.volume > 0:
                     spy_data.append(data)
-                # VIX data identification by looking for VIX close values
-                if hasattr(data, 'vix_close') and data.vix_close > 0:
-                    vix_data[data.date] = data.vix_close
+                # All data has implied volatility values
+                if hasattr(data, 'iv') and data.iv > 0:
+                    vix_data[data.date] = data.iv
             
             # Calculate realized volatility for SPY
             realized_vol_dict = self.calculate_realized_volatility(

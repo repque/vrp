@@ -19,7 +19,6 @@ from .constants import (
     DefaultConfiguration,
     ErrorMessages,
     FieldNames,
-    validate_vrp_threshold_order,
 )
 from .validators import (
     PriceValidationMixin,
@@ -65,22 +64,23 @@ class MarketData(
     VolumeValidationMixin
 ):
     """
-    Market data container for SPY and VIX daily values.
+    Market data container for OHLCV and implied volatility values.
     
-    Provides OHLCV data for SPY with VIX closing values for volatility analysis.
-    Includes comprehensive validation for price relationships and data integrity.
+    Provides OHLCV data for any underlying asset with implied volatility values 
+    for volatility risk premium analysis. Includes comprehensive validation for 
+    price relationships and data integrity.
     """
     
     date: datetime = Field(description="Trading date")
-    spy_open: Decimal = Field(description="SPY opening price")
-    spy_high: Decimal = Field(description="SPY high price")
-    spy_low: Decimal = Field(description="SPY low price") 
-    spy_close: Decimal = Field(description="SPY closing price")
-    spy_volume: int = Field(description="SPY trading volume")
-    vix_close: Decimal = Field(
+    open: Decimal = Field(description="Opening price")
+    high: Decimal = Field(description="High price")
+    low: Decimal = Field(description="Low price") 
+    close: Decimal = Field(description="Closing price")
+    volume: int = Field(description="Trading volume")
+    iv: Decimal = Field(
         gt=0, 
         le=ValidationConstants.MAX_VIX_VALUE,
-        description="VIX closing value"
+        description="Implied volatility value"
     )
     
     @field_validator('date')
@@ -94,14 +94,14 @@ class MarketData(
     @model_validator(mode='after')
     def validate_ohlc_relationships(self) -> 'MarketData':
         """Validate OHLC price relationships follow market conventions."""
-        if not (self.spy_low <= self.spy_open <= self.spy_high and
-                self.spy_low <= self.spy_close <= self.spy_high):
+        if not (self.low <= self.open <= self.high and
+                self.low <= self.close <= self.high):
             raise ValueError(
                 ErrorMessages.INVALID_OHLC_RELATIONSHIP.format(
-                    low=self.spy_low,
-                    open=self.spy_open,
-                    high=self.spy_high,
-                    close=self.spy_close
+                    low=self.low,
+                    open=self.open,
+                    high=self.high,
+                    close=self.close
                 )
             )
         return self
@@ -113,7 +113,7 @@ class MarketData(
         Returns:
             Decimal: Daily return as (close - open) / open
         """
-        return (self.spy_close - self.spy_open) / self.spy_open
+        return (self.close - self.open) / self.open
 
     def dict(self, **kwargs) -> Dict:
         """Override dict method to handle date serialization."""
@@ -144,9 +144,9 @@ class VolatilityData(
     """
     
     date: date_type = Field(description="Calculation date")
-    spy_return: Decimal = Field(description="SPY daily return")
+    daily_return: Decimal = Field(description="Daily return")
     realized_vol_30d: Decimal = Field(description="30-day realized volatility")
-    implied_vol: Decimal = Field(description="Implied volatility from VIX")
+    implied_vol: Decimal = Field(description="Implied volatility")
     vrp: Decimal = Field(description="Volatility risk premium ratio")
     vrp_state: VRPState = Field(description="VRP state classification")
     
@@ -538,21 +538,9 @@ class ConfigurationSettings(BaseModel):
         default=DefaultConfiguration.ROLLING_WINDOW_DAYS,
         description="Rolling window size in days"
     )
-    vrp_underpriced_threshold: Decimal = Field(
-        default=DefaultConfiguration.VRP_UNDERPRICED_THRESHOLD,
-        description="VRP underpriced threshold"
-    )
-    vrp_fair_upper_threshold: Decimal = Field(
-        default=DefaultConfiguration.VRP_FAIR_UPPER_THRESHOLD,
-        description="VRP fair value upper threshold"
-    )
-    vrp_normal_upper_threshold: Decimal = Field(
-        default=DefaultConfiguration.VRP_NORMAL_UPPER_THRESHOLD,
-        description="VRP normal premium upper threshold"
-    )
-    vrp_elevated_upper_threshold: Decimal = Field(
-        default=DefaultConfiguration.VRP_ELEVATED_UPPER_THRESHOLD,
-        description="VRP elevated premium upper threshold"
+    vrp_quantile_window: int = Field(
+        default=252,
+        description="Rolling window for VRP quantile-based state classification"
     )
     laplace_smoothing_alpha: Decimal = Field(
         default=DefaultConfiguration.LAPLACE_SMOOTHING_ALPHA,
@@ -619,18 +607,6 @@ class ConfigurationSettings(BaseModel):
         
         return value
     
-    @model_validator(mode='after')
-    def validate_threshold_ordering(self) -> 'ConfigurationSettings':
-        """Validate that VRP thresholds are in ascending order."""
-        thresholds = {
-            'underpriced': self.vrp_underpriced_threshold,
-            'fair_upper': self.vrp_fair_upper_threshold,
-            'normal_upper': self.vrp_normal_upper_threshold,
-            'elevated_upper': self.vrp_elevated_upper_threshold,
-        }
-        
-        validate_vrp_threshold_order(thresholds)
-        return self
     
     @model_validator(mode='after')
     def validate_data_year_consistency(self) -> 'ConfigurationSettings':
@@ -663,17 +639,10 @@ class ConfigurationSettings(BaseModel):
         Returns:
             ConfigurationSettings instance with values from settings
         """
-        # Convert list format thresholds to individual fields
-        thresholds = settings.model.vrp_thresholds
-        
         return cls(
             min_data_years=settings.data.min_data_years,
             preferred_data_years=settings.data.preferred_data_years,
             rolling_window_days=settings.model.transition_window_days,
-            vrp_underpriced_threshold=Decimal(str(thresholds[0])),
-            vrp_fair_upper_threshold=Decimal(str(thresholds[1])),
-            vrp_normal_upper_threshold=Decimal(str(thresholds[2])),
-            vrp_elevated_upper_threshold=Decimal(str(thresholds[3])),
             laplace_smoothing_alpha=Decimal(str(settings.model.laplace_smoothing_alpha)),
             min_confidence_threshold=Decimal(str(settings.model.min_confidence_for_signal)),
             max_position_size=Decimal(str(settings.trading.max_position_size_pct)),
