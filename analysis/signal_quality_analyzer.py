@@ -433,17 +433,17 @@ def main():
     print("\n" + "=" * 80)
     print("EXECUTIVE SUMMARY FOR TECH LEAD")
     print("=" * 80)
-    print(f"🎯 PREDICTION ACCURACY: {analysis['overall_accuracy']:.1%}")
-    print(f"📊 TOTAL PREDICTIONS: {analysis['total_predictions']}")
-    print(f"🔍 HIGH CONFIDENCE ACCURACY: {analysis['accuracy_by_confidence']['high']['accuracy']:.1%}")
-    print(f"📈 DIRECTIONAL ACCURACY: {analysis['directional_accuracy']['directional_accuracy']:.1%}")
+    print(f"PREDICTION ACCURACY: {analysis['overall_accuracy']:.1%}")
+    print(f"TOTAL PREDICTIONS: {analysis['total_predictions']}")
+    print(f"HIGH CONFIDENCE ACCURACY: {analysis['accuracy_by_confidence']['high']['accuracy']:.1%}")
+    print(f"DIRECTIONAL ACCURACY: {analysis['directional_accuracy']['directional_accuracy']:.1%}")
     
     if analysis['overall_accuracy'] < 0.4:
-        print("\n❌ CRITICAL: Prediction accuracy below 40% - Model needs immediate attention")
+        print("\nCRITICAL: Prediction accuracy below 40% - Model needs immediate attention")
     elif analysis['overall_accuracy'] < 0.5:
-        print("\n⚠️  WARNING: Prediction accuracy below 50% - Model needs tuning")
+        print("\nWARNING: Prediction accuracy below 50% - Model needs tuning")
     else:
-        print("\n✅ ACCEPTABLE: Prediction accuracy above 50%")
+        print("\nACCEPTABLE: Prediction accuracy above 50%")
 
 
 if __name__ == "__main__":
