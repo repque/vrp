@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/services/signal_generator.py
+# hypothesis_version: 6.138.2
+
+[0.0, 1e-10, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 1.0, 'BUY_VOL', 'HOLD', 'SELL_VOL']

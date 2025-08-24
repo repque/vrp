@@ -65,21 +65,20 @@ class TestVRPTradingSystemIntegration:
         config.model.min_signal_strength = Decimal('0.7')
         config.model.annualization_factor = Decimal('252')
         
-        # Risk management
+        # Risk management - dual structure for compatibility
+        config.BASE_POSITION_SIZE = Decimal('0.1')
+        config.MAX_POSITION_SIZE = Decimal('0.25')
+        config.TARGET_SHARPE_RATIO = Decimal('0.8')
+        
+        # Add nested risk config for risk manager compatibility
         config.risk = Mock()
         config.risk.max_position_size = Decimal('0.25')
         config.risk.base_position_size = Decimal('0.1')
         config.risk.max_drawdown_limit = Decimal('0.15')
         
         # Signal configuration
-        config.signals = Mock()
-        config.signals.extreme_state_only = True
-        config.signals.require_state_transition = True
-        config.signals.signal_cooldown_days = 3
-        
-        # Add constants that SignalGenerator expects
-        config.BASE_POSITION_SIZE = Decimal('0.1')
-        config.MAX_POSITION_SIZE = Decimal('0.25')
+        config.MIN_CONFIDENCE_THRESHOLD = Decimal('0.6')
+        config.LAPLACE_SMOOTHING_ALPHA = Decimal('1.0')
         
         return config
     

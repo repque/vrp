@@ -152,16 +152,32 @@ class BacktestEngine:
         # Need sufficient data for volatility calculations and Markov chain
         min_data_required = max(lookback_days, 90)  # Need more data for predictions
         
+        # Memory-efficient approach: maintain rolling windows instead of regenerating
+        window_size = min(200, len(data))  # Limit window size to prevent excessive memory usage
+        volatility_cache = {}  # Cache volatility calculations to avoid recomputation
+        
         # Start after minimum required period
         for i in range(min_data_required, len(data)):
             try:
                 # CRITICAL: Only use data available up to current point (no forward-looking)
-                # Use larger window for better Markov chain predictions, but ONLY historical data
-                historical_data = data[max(0, i-200):i+1]  # Up to and including current day
+                # Use sliding window approach for memory efficiency
+                start_idx = max(0, i - window_size + 1)
+                historical_data = data[start_idx:i+1]  # Up to and including current day
                 
-                # Generate volatility data for Markov chain processing
-                # This ensures no future data leakage in calculations
-                volatility_data = self.calculator.generate_volatility_data(historical_data)
+                # Check cache first to avoid redundant calculations
+                cache_key = (start_idx, i)
+                if cache_key not in volatility_cache:
+                    # Generate volatility data for Markov chain processing
+                    # This ensures no future data leakage in calculations
+                    volatility_data = self.calculator.generate_volatility_data(historical_data)
+                    volatility_cache[cache_key] = volatility_data
+                    
+                    # Limit cache size to prevent memory bloat
+                    if len(volatility_cache) > 100:  # Keep last 100 calculations
+                        oldest_key = min(volatility_cache.keys())
+                        del volatility_cache[oldest_key]
+                else:
+                    volatility_data = volatility_cache[cache_key]
                 
                 if len(volatility_data) < 60:  # Need minimum data for transition matrix
                     continue
@@ -269,19 +285,42 @@ class BacktestEngine:
             if abs(old_position) < 1e-6:  # No position held
                 return 0.0
             
-            # Calculate IV change (percentage)
-            iv_change_pct = (
-                float(curr_data.iv) - float(prev_data.iv)
-            ) / float(prev_data.iv)
+            # Robust IV change calculation with edge case handling
+            prev_iv = float(prev_data.iv)
+            curr_iv = float(curr_data.iv)
+            
+            # Edge case: prevent division by zero or near-zero IV
+            if abs(prev_iv) < 1e-10:
+                logger.warning(f"Previous IV too small ({prev_iv}), using zero P&L")
+                return 0.0
+            
+            # Edge case: check for invalid IV values
+            if prev_iv <= 0 or curr_iv <= 0:
+                logger.warning(f"Invalid IV values (prev: {prev_iv}, curr: {curr_iv}), using zero P&L")
+                return 0.0
+            
+            # Edge case: prevent extreme IV changes (likely data errors)
+            iv_change_ratio = curr_iv / prev_iv
+            if iv_change_ratio > 10.0 or iv_change_ratio < 0.1:  # 1000% or 90% change
+                logger.warning(f"Extreme IV change detected ({iv_change_ratio:.2f}x), capping at reasonable bounds")
+                iv_change_ratio = max(0.1, min(10.0, iv_change_ratio))
+            
+            iv_change_pct = iv_change_ratio - 1.0
             
             # Volatility positions profit from IV changes in the same direction:
             # - Long vol (positive position) profits when IV increases (positive change)
             # - Short vol (negative position) profits when IV decreases (negative change)
             pnl = old_position * iv_change_pct
             
+            # Edge case: prevent infinite or NaN P&L
+            if not (abs(pnl) < 1e10):  # Catches NaN, inf, and extreme values
+                logger.warning(f"Extreme P&L calculated ({pnl}), using zero")
+                return 0.0
+            
             return pnl
             
-        except (ValueError, ZeroDivisionError):
+        except (ValueError, ZeroDivisionError, OverflowError) as e:
+            logger.warning(f"P&L calculation error: {str(e)}, using zero P&L")
             return 0.0
     
     def _calculate_performance_metrics(self, trades: List[Dict]) -> Dict[str, Any]:

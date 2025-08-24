@@ -13,6 +13,7 @@ from src.models.data_models import VolatilityData, VRPState, TradingSignal, Conf
 from src.models.constants import DefaultConfiguration
 from src.services.markov_chain_model import MarkovChainModel
 from src.utils.exceptions import CalculationError, InsufficientDataError, ModelStateError
+from src.utils.monitoring import monitoring
 
 logger = logging.getLogger(__name__)
 
@@ -63,57 +64,58 @@ class SignalGenerator:
             )
         
         try:
-            # Get current state from latest data point
-            current_state = volatility_data[-1].vrp_state
-            current_vrp = float(volatility_data[-1].vrp)
-            
-            # Update transition matrix with recent data
-            transition_matrix = self.markov_model.update_transition_matrix(
-                volatility_data, window_days
-            )
-            
-            # Predict next state probabilities
-            state_probabilities = self.markov_model.predict_next_state(
-                current_state, transition_matrix
-            )
-            
-            # Generate signal based on state predictions
-            signal_type, signal_strength, reason = self._generate_predictive_signal(
-                current_state, state_probabilities, current_vrp
-            )
-            
-            # Calculate confidence metrics
-            confidence_metrics = self._calculate_confidence_metrics(
-                state_probabilities, transition_matrix, len(volatility_data)
-            )
-            
-            # Determine predicted state (highest probability)
-            predicted_state = max(state_probabilities.items(), key=lambda x: x[1])[0]
-            
-            # Calculate position sizes
-            recommended_size = Decimal(str(float(self.config.BASE_POSITION_SIZE)))
-            risk_adjusted_size = self._calculate_position_size(
-                signal_strength, float(confidence_metrics.overall_confidence)
-            )
-            
-            # Create trading signal
-            signal = TradingSignal(
-                date=volatility_data[-1].date,
-                signal_type=signal_type,
-                current_state=current_state,
-                predicted_state=predicted_state,
-                signal_strength=Decimal(str(signal_strength)),
-                confidence_score=confidence_metrics.overall_confidence,
-                recommended_position_size=recommended_size,
-                risk_adjusted_size=risk_adjusted_size,
-                reason=reason
-            )
-            
-            logger.info(f"Generated predictive signal: {signal_type} | "
-                       f"{current_state.name} -> {predicted_state.name} | "
-                       f"Confidence: {confidence_metrics.overall_confidence:.3f}")
-            
-            return signal
+            with monitoring.performance_monitor("signal_generation"):
+                # Get current state from latest data point
+                current_state = volatility_data[-1].vrp_state
+                current_vrp = float(volatility_data[-1].vrp)
+                
+                # Update transition matrix with recent data
+                transition_matrix = self.markov_model.update_transition_matrix(
+                    volatility_data, window_days
+                )
+                
+                # Predict next state probabilities
+                state_probabilities = self.markov_model.predict_next_state(
+                    current_state, transition_matrix
+                )
+                
+                # Generate signal based on state predictions
+                signal_type, signal_strength, reason = self._generate_predictive_signal(
+                    current_state, state_probabilities, current_vrp
+                )
+                
+                # Calculate confidence metrics
+                confidence_metrics = self._calculate_confidence_metrics(
+                    state_probabilities, transition_matrix, len(volatility_data)
+                )
+                
+                # Determine predicted state (highest probability)
+                predicted_state = max(state_probabilities.items(), key=lambda x: x[1])[0]
+                
+                # Calculate position sizes
+                recommended_size = Decimal(str(float(self.config.BASE_POSITION_SIZE)))
+                risk_adjusted_size = self._calculate_position_size(
+                    signal_strength, float(confidence_metrics.overall_confidence)
+                )
+                
+                # Create trading signal
+                signal = TradingSignal(
+                    date=volatility_data[-1].date,
+                    signal_type=signal_type,
+                    current_state=current_state,
+                    predicted_state=predicted_state,
+                    signal_strength=Decimal(str(signal_strength)),
+                    confidence_score=confidence_metrics.overall_confidence,
+                    recommended_position_size=recommended_size,
+                    risk_adjusted_size=risk_adjusted_size,
+                    reason=reason
+                )
+                
+                logger.info(f"Generated predictive signal: {signal_type} | "
+                           f"{current_state.name} -> {predicted_state.name} | "
+                           f"Confidence: {confidence_metrics.overall_confidence:.3f}")
+                
+                return signal
             
         except Exception as e:
             if isinstance(e, (InsufficientDataError, ModelStateError)):

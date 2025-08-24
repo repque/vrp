@@ -1,0 +1,4 @@
+# file: /Users/repque/dev/src/vrp/services/backtest_engine.py
+# hypothesis_version: 6.138.2
+
+[0.0, 1e-06, 200, 252, '%Y-%m-%d', 'BUY_VOL', 'HOLD', 'LEGACY_TRADE', 'SELL_VOL', 'Starting backtest', 'action', 'avg_loss', 'avg_win', 'backtest_execution', 'confidence', 'current_state', 'date', 'exit_confidence', 'inf', 'losing_trades', 'max_drawdown', 'new_position', 'pnl', 'position_after', 'position_before', 'predicted_state', 'profit_factor', 'reason', 'sharpe_ratio', 'signal', 'total_return', 'total_trades', 'vrp_ratio', 'win_rate', 'winning_trades']
