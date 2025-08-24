@@ -53,6 +53,10 @@ class TestSignalGenerator:
         config.signals.min_prediction_horizon_days = 1
         config.signals.signal_cooldown_days = 3
         
+        # Add top-level attributes that signal generator expects
+        config.BASE_POSITION_SIZE = Decimal('0.02')
+        config.MAX_POSITION_SIZE = Decimal('0.05')
+        
         return config
     
     @pytest.fixture

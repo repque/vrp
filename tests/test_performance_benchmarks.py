@@ -61,6 +61,10 @@ def performance_config():
     config.risk.max_position_size = Decimal('0.25')
     config.risk.base_position_size = Decimal('0.1')
     
+    # Add top-level attributes that signal generator expects
+    config.BASE_POSITION_SIZE = Decimal('0.02')
+    config.MAX_POSITION_SIZE = Decimal('0.05')
+    
     return config
 
 
