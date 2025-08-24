@@ -451,3 +451,52 @@ class MarkovChainModel(IMarkovChainModel):
         except Exception as e:
             logger.error(f"Failed to calculate transition statistics: {str(e)}")
             return {}
+    
+    def get_transition_matrix(self) -> TransitionMatrix:
+        """
+        Get current transition matrix.
+        
+        Returns the most recently cached transition matrix, or creates a default
+        matrix if no cache exists.
+        
+        Returns:
+            TransitionMatrix: Current or default transition matrix
+            
+        Raises:
+            ModelStateError: If unable to create transition matrix
+        """
+        try:
+            # If we have cached matrices, return the most recent one
+            if self._matrix_cache:
+                # Get the most recently cached matrix
+                most_recent_key = max(self._matrix_cache.keys(), key=lambda k: self._matrix_cache[k].last_updated)
+                cached_matrix = self._matrix_cache[most_recent_key]
+                logger.info(f"Retrieved cached transition matrix with {cached_matrix.observation_count} observations")
+                return cached_matrix
+            
+            # If no cache, create a default uniform transition matrix
+            logger.warning("No cached transition matrix found, creating default uniform matrix")
+            
+            from datetime import date
+            from decimal import Decimal
+            
+            # Create uniform probability matrix (equal probability for all transitions)
+            uniform_prob = Decimal('0.2')  # 1/5 for each of the 5 states
+            default_matrix = [
+                [uniform_prob] * self.num_states for _ in range(self.num_states)
+            ]
+            
+            transition_matrix = TransitionMatrix(
+                matrix=default_matrix,
+                observation_count=0,
+                window_start=date.today(),
+                window_end=date.today(),
+                last_updated=datetime.now()
+            )
+            
+            logger.info("Created default uniform transition matrix")
+            return transition_matrix
+            
+        except Exception as e:
+            logger.error(f"Failed to get transition matrix: {str(e)}")
+            raise ModelStateError(f"Unable to get transition matrix: {str(e)}")

@@ -6,7 +6,7 @@ constants to ensure consistency and maintainability across the system.
 """
 
 from decimal import Decimal
-from typing import List
+from typing import Any, Dict, List
 
 
 class ValidationConstants:
@@ -58,32 +58,148 @@ class BusinessConstants:
     MAX_ROLLING_WINDOW_DAYS = 365
 
 
-class DefaultConfiguration:
-    """Default configuration values for the VRP system."""
+class ConfigurationSection:
+    """Base class for configuration sections with validation."""
+    
+    def __init__(self, **kwargs):
+        """Initialize configuration section with provided values."""
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+    
+    def __setattr__(self, name: str, value) -> None:
+        """Set attribute with type validation."""
+        # Type validation for numeric fields
+        if name.endswith('_days') or name.endswith('_years'):
+            if not isinstance(value, (int, float)):
+                raise TypeError(f"{name} must be numeric (int or float), got {type(value).__name__}")
+            if isinstance(value, (int, float)) and value <= 0:
+                raise ValueError(f"{name} must be positive, got {value}")
+        
+        # Convert strings to Decimal for financial fields
+        if name.endswith('_threshold') or name.endswith('_pct') or name.endswith('_alpha'):
+            if not isinstance(value, (str, int, float, Decimal)):
+                raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
+            if isinstance(value, (str, int, float)):
+                try:
+                    value = Decimal(str(value))
+                except (ValueError, TypeError, Exception) as e:
+                    raise ValueError(f"Invalid value for {name}: {value}. Must be numeric.") from e
+        
+        # Range validation for percentage fields
+        if name.endswith('_pct') and isinstance(value, (Decimal, float)):
+            if value < 0 or value > 1:
+                raise ValueError(f"{name} must be between 0 and 1, got {value}")
+        
+        # Additional validation for threshold fields
+        if name.endswith('_threshold') and isinstance(value, (Decimal, float)):
+            if value < 0:
+                raise ValueError(f"{name} cannot be negative, got {value}")
+            if value > 100:  # Reasonable upper bound for VRP thresholds
+                raise ValueError(f"{name} exceeds reasonable maximum (100), got {value}")
+        
+        super().__setattr__(name, value)
 
-    # Data requirements - synchronized with settings.py
-    MIN_DATA_YEARS = 3
-    PREFERRED_DATA_YEARS = 5
-    ROLLING_WINDOW_DAYS = 60  # Same as transition_window_days in settings.py
 
-    # Volatility calculation constants
-    VOLATILITY_ANNUALIZATION_FACTOR = 252  # Trading days per year for volatility annualization
+class ModelConfiguration(ConfigurationSection):
+    """Model parameters and thresholds configuration."""
+    
+    def __init__(self):
+        super().__init__(
+            # VRP thresholds
+            vrp_underpriced_threshold=Decimal('0.90'),
+            vrp_fair_upper_threshold=Decimal('1.10'),
+            vrp_normal_upper_threshold=Decimal('1.30'),
+            vrp_elevated_upper_threshold=Decimal('1.50'),
+            
+            # Time windows
+            transition_window_days=60,
+            realized_vol_window_days=30,
+            
+            # Model parameters
+            laplace_smoothing_alpha=Decimal('1.0'),
+            min_confidence_for_signal=Decimal('0.6'),
+            
+            # Volatility calculation
+            volatility_annualization_factor=252.0,
+            
+            # Validation thresholds
+            vrp_min_reasonable=Decimal('0.1'),
+            vrp_max_reasonable=Decimal('10.0')
+        )
+    
+    def __setattr__(self, name: str, value) -> None:
+        """Set attribute with VRP threshold validation."""
+        super().__setattr__(name, value)
+        
+        # Validate threshold ordering after setting
+        if hasattr(self, 'vrp_underpriced_threshold') and hasattr(self, 'vrp_fair_upper_threshold'):
+            if self.vrp_underpriced_threshold >= self.vrp_fair_upper_threshold:
+                raise ValueError("VRP underpriced threshold must be less than fair upper threshold")
 
-    # VRP adaptive classification - quantile-based boundaries
-    VRP_QUANTILE_BOUNDS = BusinessConstants.VRP_QUANTILE_BOUNDS
 
-    # Model parameters - synchronized with settings.py
-    LAPLACE_SMOOTHING_ALPHA = Decimal('1.0')  # Matches settings.py default
-    MIN_CONFIDENCE_THRESHOLD = Decimal('0.6')  # Matches min_confidence_for_signal
+class TradingConfiguration(ConfigurationSection):
+    """Trading and risk management configuration."""
+    
+    def __init__(self):
+        super().__init__(
+            # Position sizing
+            base_position_size_pct=Decimal('0.02'),
+            max_position_size_pct=Decimal('0.05'),
+            
+            # Signal generation
+            extreme_low_confidence_threshold=Decimal('0.3'),
+            extreme_high_confidence_threshold=Decimal('0.6'),
+            
+            # Transaction costs
+            transaction_cost_bps=Decimal('10.0'),
+            
+            # Risk management
+            target_sharpe_ratio=Decimal('0.8')
+        )
+    
+    def __setattr__(self, name: str, value) -> None:
+        """Set attribute with trading parameter validation."""
+        super().__setattr__(name, value)
+        
+        # Validate position sizing
+        if hasattr(self, 'base_position_size_pct') and hasattr(self, 'max_position_size_pct'):
+            if self.base_position_size_pct >= self.max_position_size_pct:
+                raise ValueError("Base position size must be less than max position size")
 
-    # Risk management - matches TradingConfig defaults
-    BASE_POSITION_SIZE = Decimal('0.02')  # From settings.py base_position_size_pct
-    MAX_POSITION_SIZE = Decimal('0.05')   # From settings.py max_position_size_pct
-    TARGET_SHARPE_RATIO = Decimal('0.8')
 
-    # System monitoring
-    MAX_DATA_FRESHNESS_HOURS = 24
-    MAX_MATRIX_AGE_DAYS = 30
+class DataConfiguration(ConfigurationSection):
+    """Data fetching and processing configuration."""
+    
+    def __init__(self):
+        super().__init__(
+            # Data requirements
+            min_data_years=3,
+            preferred_data_years=5,
+            
+            # Data validation
+            max_missing_days_pct=Decimal('0.02'),
+            
+            # Performance requirements
+            max_daily_processing_seconds=30,
+            max_memory_usage_mb=500
+        )
+
+
+class DatabaseConfiguration(ConfigurationSection):
+    """Database connection and storage configuration."""
+    
+    def __init__(self):
+        super().__init__(
+            database_url="sqlite:///vrp_model.db",
+            database_path="vrp_model.db",
+            connection_timeout=30,
+            connection_pool_size=5,
+            max_overflow=10,
+            enable_wal_mode=True,
+            enable_foreign_keys=True,
+            backup_retention_days=7,
+            auto_vacuum="INCREMENTAL"
+        )
 
 
 class ErrorMessages:

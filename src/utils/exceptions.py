@@ -71,17 +71,25 @@ class DataValidationError(VRPModelError):
 class CalculationError(VRPModelError):
     """Raised when mathematical calculations fail."""
 
-    def __init__(self, calculation: str, message: str, error_code: str = "CALCULATION_FAILED"):
+    def __init__(self, message: str, calculation: str = None, error_code: str = "CALCULATION_FAILED"):
         """
         Initialize calculation error.
 
         Args:
-            calculation: Name of the calculation that failed
-            message: Detailed error message
+            message: Detailed error message or calculation name (for backward compatibility)
+            calculation: Optional name of the specific calculation that failed
             error_code: Error code for this type of failure
         """
-        super().__init__(f"Calculation '{calculation}' failed: {message}", error_code)
-        self.calculation = calculation
+        if calculation is not None:
+            # Traditional usage: CalculationError(message, calculation)
+            formatted_message = f"Calculation '{calculation}' failed: {message}"
+            self.calculation = calculation
+        else:
+            # Simple usage: CalculationError("Calculation failed")
+            formatted_message = f"Calculation failed: {message}"
+            self.calculation = None
+        
+        super().__init__(formatted_message, error_code)
 
 
 class ModelStateError(VRPModelError):
@@ -181,21 +189,42 @@ class OperationError(VRPModelError):
 class InsufficientDataError(VRPModelError):
     """Raised when there is insufficient data for model operations."""
 
-    def __init__(self, required: int, available: int, error_code: str = "INSUFFICIENT_DATA"):
+    def __init__(self, message_or_required=None, available: int | None = None, *, 
+                 required: int | None = None, error_code: str = "INSUFFICIENT_DATA"):
         """
         Initialize insufficient data error.
 
+        Supports multiple usage patterns:
+        1. Positional: InsufficientDataError(required, available)
+        2. Keyword: InsufficientDataError(required=10, available=5)
+        3. Simple: InsufficientDataError("Custom message")
+
         Args:
-            required: Required number of data points
-            available: Available number of data points
+            message_or_required: Either error message (simple usage) or required count (positional usage)
+            available: Available number of data points (positional or keyword usage)
+            required: Required number of data points (keyword-only usage)
             error_code: Error code for this type of failure
         """
-        super().__init__(
-            f"Insufficient data: required {required}, available {available}",
-            error_code
-        )
-        self.required = required
-        self.available = available
+        # Handle keyword-only usage: InsufficientDataError(required=10, available=5)
+        if required is not None:
+            if message_or_required is not None:
+                raise ValueError("Cannot specify both positional 'message_or_required' and keyword 'required'")
+            formatted_message = f"Insufficient data: required {required}, available {available or 0}"
+            self.required = required
+            self.available = available or 0
+        elif available is not None:
+            # Positional detailed usage: InsufficientDataError(required, available)
+            required_count = message_or_required
+            formatted_message = f"Insufficient data: required {required_count}, available {available}"
+            self.required = required_count
+            self.available = available
+        else:
+            # Simple usage: InsufficientDataError("Not enough data")
+            formatted_message = f"Insufficient data: {message_or_required}"
+            self.required = None
+            self.available = None
+        
+        super().__init__(formatted_message, error_code)
 
 
 class ModelConvergenceError(VRPModelError):

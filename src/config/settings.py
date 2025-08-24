@@ -146,6 +146,46 @@ class DatabaseConfig(BaseSettings):
         description="Database connection URL"
     )
 
+    database_path: str = Field(
+        default="vrp_model.db",
+        description="Path to SQLite database file"
+    )
+
+    connection_timeout: int = Field(
+        default=30,
+        description="Database connection timeout in seconds"
+    )
+
+    connection_pool_size: int = Field(
+        default=5,
+        description="Database connection pool size"
+    )
+
+    max_overflow: int = Field(
+        default=10,
+        description="Maximum connection pool overflow"
+    )
+
+    enable_wal_mode: bool = Field(
+        default=True,
+        description="Enable SQLite WAL mode for better concurrency"
+    )
+
+    enable_foreign_keys: bool = Field(
+        default=True,
+        description="Enable foreign key constraints"
+    )
+
+    backup_retention_days: int = Field(
+        default=7,
+        description="Days to retain database backups"
+    )
+
+    auto_vacuum: str = Field(
+        default="INCREMENTAL",
+        description="SQLite auto vacuum mode (NONE, FULL, INCREMENTAL)"
+    )
+
     redis_url: str = Field(
         default="redis://localhost:6379/0",
         description="Redis cache connection URL"
@@ -165,6 +205,16 @@ class DatabaseConfig(BaseSettings):
     signals_table: str = Field(
         default="trading_signals",
         description="Table name for trading signals"
+    )
+
+    positions_table: str = Field(
+        default="positions",
+        description="Table name for trading positions"
+    )
+
+    system_state_table: str = Field(
+        default="system_state",
+        description="Table name for system operational state"
     )
 
 

@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from src.models.data_models import MarketData, VRPState, TradingSignal, VolatilityData
-from src.models.constants import DefaultConfiguration, BusinessConstants
+from src.models.constants import BusinessConstants
+from src.config.settings import Settings, get_settings
 from src.utils.exceptions import DataQualityError, CalculationError, InsufficientDataError, ModelStateError
 from services import VRPCalculator, SignalGenerator, BacktestEngine
 
@@ -42,22 +43,22 @@ class VRPTrader:
         signal = trader.get_signal()
     """
     
-    def __init__(self, config: Optional[DefaultConfiguration] = None):
+    def __init__(self, settings: Optional[Settings] = None):
         """
         Initialize VRP trader with service dependencies.
         
         Args:
-            config: System configuration, uses default if not provided
+            settings: System configuration, uses default if not provided
         """
-        self.config = config or DefaultConfiguration()
+        self.settings = settings or get_settings()
         self.data = None
         self.current_vrp = None
         self.current_state = None
         self._volatility_data_cache = None
         
         # Initialize predictive service dependencies
-        self.calculator = VRPCalculator(self.config)
-        self.signal_generator = SignalGenerator(self.config)
+        self.calculator = VRPCalculator(self.settings)
+        self.signal_generator = SignalGenerator(self.settings)
         self.backtest_engine = BacktestEngine(self.calculator, self.signal_generator)
         
         logger.info(f"VRPTrader initialized with predictive Markov chain services")

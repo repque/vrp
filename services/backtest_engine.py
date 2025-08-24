@@ -246,7 +246,7 @@ class BacktestEngine:
             New position size
         """
         # Use base position size from configuration
-        position_size = float(self.calculator.config.BASE_POSITION_SIZE)
+        position_size = self.calculator.settings.trading.base_position_size_pct
         
         if signal == "BUY_VOL":
             # Always go long volatility (positive position)

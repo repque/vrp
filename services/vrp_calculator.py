@@ -11,7 +11,7 @@ from typing import List, Optional
 from decimal import Decimal
 
 from src.models.data_models import MarketData, VRPState, VolatilityData
-from src.models.constants import DefaultConfiguration
+from src.config.settings import Settings, get_settings
 from src.services.vrp_classifier import VRPClassifier
 from src.utils.exceptions import CalculationError, InsufficientDataError
 
@@ -26,15 +26,15 @@ class VRPCalculator:
     calculations and state classifications for predictive modeling.
     """
     
-    def __init__(self, config: Optional[DefaultConfiguration] = None):
+    def __init__(self, settings: Optional[Settings] = None):
         """
         Initialize VRP calculator with configuration.
         
         Args:
-            config: System configuration, uses default if not provided
+            settings: System configuration, uses default if not provided
         """
-        self.config = config or DefaultConfiguration()
-        self.trading_days_per_year = self.config.VOLATILITY_ANNUALIZATION_FACTOR
+        self.settings = settings or get_settings()
+        self.trading_days_per_year = self.settings.model.volatility_annualization_factor
         self.vrp_classifier = VRPClassifier()
         
         logger.info("VRPCalculator initialized with adaptive VRP classification")

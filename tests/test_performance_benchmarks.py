@@ -65,6 +65,11 @@ def performance_config():
     config.BASE_POSITION_SIZE = Decimal('0.02')
     config.MAX_POSITION_SIZE = Decimal('0.05')
     
+    # Trading configuration for SignalGenerator
+    config.trading = Mock()
+    config.trading.base_position_size_pct = 0.02
+    config.trading.max_position_size_pct = 0.05
+    
     return config
 
 

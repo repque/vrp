@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
 
 from src.models.data_models import VolatilityData, VRPState, TradingSignal, ConfidenceMetrics, TransitionMatrix
-from src.models.constants import DefaultConfiguration
+from src.config.settings import Settings, get_settings
 from src.services.markov_chain_model import MarkovChainModel
 from src.utils.exceptions import CalculationError, InsufficientDataError, ModelStateError
 from src.utils.monitoring import monitoring
@@ -26,14 +26,14 @@ class SignalGenerator:
     than reactive threshold-based rules. Uses confidence scoring to size positions.
     """
     
-    def __init__(self, config: Optional[DefaultConfiguration] = None):
+    def __init__(self, settings: Optional[Settings] = None):
         """
         Initialize predictive signal generator.
         
         Args:
-            config: System configuration
+            settings: System configuration
         """
-        self.config = config or DefaultConfiguration()
+        self.settings = settings or get_settings()
         self.markov_model = MarkovChainModel()
         
         logger.info("SignalGenerator initialized with Markov chain prediction")
@@ -93,7 +93,7 @@ class SignalGenerator:
                 predicted_state = max(state_probabilities.items(), key=lambda x: x[1])[0]
                 
                 # Calculate position sizes
-                recommended_size = Decimal(str(float(self.config.BASE_POSITION_SIZE)))
+                recommended_size = Decimal(str(self.settings.trading.base_position_size_pct))
                 risk_adjusted_size = self._calculate_position_size(
                     signal_strength, float(confidence_metrics.overall_confidence)
                 )
@@ -111,9 +111,16 @@ class SignalGenerator:
                     reason=reason
                 )
                 
-                logger.info(f"Generated predictive signal: {signal_type} | "
-                           f"{current_state.name} -> {predicted_state.name} | "
-                           f"Confidence: {confidence_metrics.overall_confidence:.3f}")
+                try:
+                    signal_type_name = getattr(signal_type, 'name', str(signal_type))
+                    current_state_name = getattr(current_state, 'name', str(current_state))
+                    predicted_state_name = getattr(predicted_state, 'name', str(predicted_state))
+                    overall_confidence = getattr(confidence_metrics, 'overall_confidence', 0.0)
+                    logger.info(f"Generated predictive signal: {signal_type_name} | "
+                               f"{current_state_name} -> {predicted_state_name} | "
+                               f"Confidence: {overall_confidence:.3f}")
+                except Exception:
+                    logger.info("Generated predictive signal completed")
                 
                 return signal
             
@@ -244,13 +251,13 @@ class SignalGenerator:
             Position size as decimal percentage
         """
         # Base position size from configuration
-        base_size = float(self.config.BASE_POSITION_SIZE)
+        base_size = self.settings.trading.base_position_size_pct
         
         # Adjust based on signal strength and confidence
         adjusted_size = base_size * signal_strength * confidence
         
         # Cap at maximum position size
-        max_size = float(self.config.MAX_POSITION_SIZE)
+        max_size = self.settings.trading.max_position_size_pct
         final_size = min(adjusted_size, max_size)
         
         return Decimal(str(final_size))
@@ -280,3 +287,41 @@ class SignalGenerator:
             return False
         
         return True
+    
+    def initialize_from_state(self, model_state) -> None:
+        """
+        Initialize signal generator from persisted model state.
+        
+        Args:
+            model_state: ModelState with transition matrix and parameters
+        """
+        try:
+            if hasattr(model_state, 'transition_matrix'):
+                self.markov_model.load_transition_matrix(model_state.transition_matrix)
+                logger.info("Signal generator initialized from persisted state")
+            else:
+                logger.warning("Model state missing transition matrix - using defaults")
+        except Exception as e:
+            logger.error(f"Failed to initialize from state: {str(e)}")
+    
+    def get_current_transition_matrix(self) -> TransitionMatrix:
+        """
+        Get current transition matrix from Markov model.
+        
+        Returns:
+            Current TransitionMatrix object
+        """
+        try:
+            return self.markov_model.get_transition_matrix()
+        except Exception as e:
+            logger.error(f"Failed to get transition matrix: {str(e)}")
+            # Return default transition matrix
+            from datetime import datetime, date
+            from decimal import Decimal
+            return TransitionMatrix(
+                matrix=[[Decimal('0.2')] * 5 for _ in range(5)],  # Default uniform probabilities
+                observation_count=0,
+                window_start=date.today(),
+                window_end=date.today(),
+                last_updated=datetime.now()
+            )

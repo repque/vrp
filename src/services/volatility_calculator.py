@@ -7,14 +7,15 @@ VRP ratio computation, and volatility data generation.
 
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 
-from src.config.settings import get_settings
+from src.config.settings import Settings, get_settings
 from src.interfaces.contracts import IVolatilityCalculator, IVRPClassifier
-from src.models.data_models import MarketDataPoint, VolatilityData
+from src.models.data_models import MarketDataPoint, VolatilityData, VRPState
 from src.utils.exceptions import CalculationError, InsufficientDataError
 
 logger = logging.getLogger(__name__)
@@ -28,14 +29,15 @@ class VolatilityCalculator(IVolatilityCalculator):
     computes volatility risk premium ratios with proper error handling.
     """
 
-    def __init__(self, vrp_classifier: IVRPClassifier):
+    def __init__(self, settings: Settings = None, vrp_classifier: IVRPClassifier = None):
         """
         Initialize volatility calculator.
 
         Args:
-            vrp_classifier: VRP state classifier for state assignment
+            settings: System configuration settings
+            vrp_classifier: Optional VRP state classifier for state assignment
         """
-        self.settings = get_settings()
+        self.settings = settings or get_settings()
         self.vrp_classifier = vrp_classifier
 
     def calculate_realized_volatility(
@@ -204,7 +206,7 @@ class VolatilityCalculator(IVolatilityCalculator):
                         vrp_ratio = self.calculate_vrp_ratio(implied_vol, realized_vol)
 
                         # Classify VRP state
-                        vrp_state = self.vrp_classifier.classify_vrp_state(vrp_ratio)
+                        vrp_state = self._classify_vrp_state(vrp_ratio)
 
                         # Create VolatilityData object
                         vol_data = VolatilityData(
@@ -326,3 +328,41 @@ class VolatilityCalculator(IVolatilityCalculator):
 
         logger.info(f"Calculated volatility statistics for {stats['count']} observations")
         return stats
+
+    def _classify_vrp_state(self, vrp_ratio: float) -> VRPState:
+        """
+        Classify VRP ratio into discrete state using configuration thresholds.
+        
+        This is a fallback implementation when no VRP classifier is provided.
+        Uses the same logic as VRPClassifier fallback method.
+        
+        Args:
+            vrp_ratio: Volatility risk premium ratio to classify
+            
+        Returns:
+            VRP state classification
+        """
+        if self.vrp_classifier is not None:
+            # Use the provided VRP classifier if available
+            return self.vrp_classifier.classify_vrp_state(vrp_ratio)
+        
+        # Fallback classification using configuration thresholds
+        vrp_decimal = Decimal(str(vrp_ratio))
+        
+        # Use configuration thresholds
+        thresholds = self.settings.model.vrp_thresholds
+        underpriced = Decimal(str(thresholds[0]))
+        fair_upper = Decimal(str(thresholds[1]))
+        normal_upper = Decimal(str(thresholds[2]))
+        elevated_upper = Decimal(str(thresholds[3]))
+        
+        if vrp_decimal < underpriced:
+            return VRPState.EXTREME_LOW
+        elif vrp_decimal < fair_upper:
+            return VRPState.FAIR_VALUE
+        elif vrp_decimal < normal_upper:
+            return VRPState.NORMAL_PREMIUM
+        elif vrp_decimal < elevated_upper:
+            return VRPState.ELEVATED_PREMIUM
+        else:
+            return VRPState.EXTREME_HIGH

@@ -76,6 +76,11 @@ class TestVRPTradingSystemIntegration:
         config.risk.base_position_size = Decimal('0.1')
         config.risk.max_drawdown_limit = Decimal('0.15')
         
+        # Trading configuration for SignalGenerator
+        config.trading = Mock()
+        config.trading.base_position_size_pct = 0.1
+        config.trading.max_position_size_pct = 0.25
+        
         # Signal configuration
         config.MIN_CONFIDENCE_THRESHOLD = Decimal('0.6')
         config.LAPLACE_SMOOTHING_ALPHA = Decimal('1.0')
