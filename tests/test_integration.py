@@ -47,7 +47,7 @@ class TestVRPTradingSystemIntegration:
         
         # Data configuration
         config.data = Mock()
-        config.data.yahoo_finance_api_key = "test_api_key"
+        # No external API keys needed - system uses CSV data
         config.data.request_timeout_seconds = 30
         config.data.max_retry_attempts = 3
         config.data.validate_ohlc_consistency = True

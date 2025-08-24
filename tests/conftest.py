@@ -440,8 +440,8 @@ def mock_external_apis():
     """Create mock external API responses for testing."""
     mocks = {}
     
-    # Mock Yahoo Finance API response
-    mocks['yahoo_finance'] = {
+    # Mock external API response (unused but kept for compatibility)  
+    mocks['external_api'] = {
         'SPY': {
             '2023-01-01': {'Open': 400.0, 'High': 405.0, 'Low': 395.0, 'Close': 402.0, 'Volume': 100000000},
             '2023-01-02': {'Open': 402.0, 'High': 407.0, 'Low': 397.0, 'Close': 405.0, 'Volume': 110000000}

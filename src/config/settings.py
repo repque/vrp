@@ -108,10 +108,6 @@ class DataConfig(BaseSettings):
     """Data fetching and processing configuration."""
 
     # API configuration
-    yahoo_finance_base_url: str = Field(
-        default="https://query1.finance.yahoo.com/v8/finance/chart/",
-        description="Yahoo Finance API base URL"
-    )
 
     # Data requirements
     min_data_years: int = Field(

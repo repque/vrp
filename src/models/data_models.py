@@ -617,7 +617,6 @@ class BacktestResult(BaseModel):
 class DataConfiguration(BaseModel):
     """Data fetching and processing configuration."""
     
-    yahoo_finance_api_key: Optional[str] = Field(default=None, description="Yahoo Finance API key")
     fred_api_key: Optional[str] = Field(default=None, description="FRED API key")
     alpha_vantage_api_key: Optional[str] = Field(default=None, description="Alpha Vantage API key")
     request_timeout_seconds: int = Field(default=30, description="API request timeout")
@@ -646,18 +645,11 @@ class DataConfiguration(BaseModel):
         # Only require API keys if this appears to be a production configuration
         # (i.e., any API key field has been explicitly set to a non-default value)
         has_explicit_api_config = any([
-            self.yahoo_finance_api_key and self.yahoo_finance_api_key != "",
             self.fred_api_key and self.fred_api_key != "",
             self.alpha_vantage_api_key and self.alpha_vantage_api_key != "",
         ])
         
-        # Only validate API keys if explicit configuration is provided
-        if has_explicit_api_config and (self.yahoo_finance_api_key is None or self.yahoo_finance_api_key == ""):
-            raise ConfigurationError("Missing required field: yahoo_finance_api_key")
-        
         # Validate API key format and length (only if they exist and are not empty)
-        if self.yahoo_finance_api_key and len(self.yahoo_finance_api_key) < 3:
-            raise ConfigurationError("API key yahoo_finance_api_key too short")
         
         # Check other API keys if they are provided (not None and not empty)
         if self.fred_api_key and len(self.fred_api_key) < 3:
@@ -869,7 +861,6 @@ class ConfigurationSettings(BaseModel):
         
         # Environment variable mappings
         env_mappings = {
-            'VRP_YAHOO_API_KEY': ('data', 'yahoo_finance_api_key'),
             'VRP_MAX_POSITION_SIZE': ('risk', 'max_position_size'),
             'VRP_ROLLING_WINDOW_DAYS': ('model', 'rolling_window_days'),
         }
@@ -950,7 +941,7 @@ class ConfigurationSettings(BaseModel):
             data_config = values['data']
             if isinstance(data_config, dict):
                 # Validate API keys
-                api_keys = ['yahoo_finance_api_key', 'fred_api_key', 'alpha_vantage_api_key']
+                api_keys = ['fred_api_key', 'alpha_vantage_api_key']
                 for key in api_keys:
                     if key in data_config:
                         if data_config[key] == "":
@@ -960,10 +951,6 @@ class ConfigurationSettings(BaseModel):
                         elif isinstance(data_config[key], str) and len(data_config[key]) < 3:
                             raise ConfigurationError(f"API key {key} is too short (minimum 3 characters)")
                 
-                # Check for required yahoo_finance_api_key specifically (only if data section has content)
-                if data_config:
-                    if 'yahoo_finance_api_key' not in data_config or not data_config['yahoo_finance_api_key']:
-                        raise ConfigurationError("Missing required field: yahoo_finance_api_key")
             
         # Validate percentage fields (0-1 range)
             percentage_fields = [
