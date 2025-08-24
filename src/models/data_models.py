@@ -346,6 +346,50 @@ class ModelPrediction(BaseModel):
     )
 
 
+class ExitConfidenceConfig(BaseModel):
+    """
+    Configuration model for three-tier confidence thresholds.
+    
+    Defines the confidence levels for different trading decisions:
+    - Entry threshold: Minimum confidence to enter new positions
+    - Exit threshold: Minimum confidence to maintain existing positions
+    - Flip threshold: Minimum confidence to flip positions directly
+    """
+    
+    entry_threshold: Decimal = Field(
+        default=Decimal('0.65'),
+        ge=Decimal('0.0'),
+        le=Decimal('1.0'),
+        description="Minimum confidence to enter new positions"
+    )
+    exit_threshold: Decimal = Field(
+        default=Decimal('0.40'),
+        ge=Decimal('0.0'),
+        le=Decimal('1.0'),
+        description="Minimum confidence to maintain existing positions"
+    )
+    flip_threshold: Decimal = Field(
+        default=Decimal('0.75'),
+        ge=Decimal('0.0'),
+        le=Decimal('1.0'),
+        description="Minimum confidence to flip positions directly"
+    )
+    
+    @model_validator(mode='after')
+    def validate_threshold_ordering(self) -> 'ExitConfidenceConfig':
+        """Validate that thresholds are in logical order."""
+        if not (self.exit_threshold <= self.entry_threshold <= self.flip_threshold):
+            raise ValueError(
+                f"Thresholds must be ordered: exit ({self.exit_threshold}) <= "
+                f"entry ({self.entry_threshold}) <= flip ({self.flip_threshold})"
+            )
+        return self
+
+    model_config = ConfigDict(
+        use_enum_values=True
+    )
+
+
 class TradingSignal(BaseModel):
     """
     Trading signal with confidence and position sizing recommendations.
@@ -363,6 +407,12 @@ class TradingSignal(BaseModel):
     recommended_position_size: Decimal = Field(description="Recommended position size")
     risk_adjusted_size: Decimal = Field(description="Risk adjusted position size")
     reason: str = Field(description="Signal generation reason")
+    exit_confidence: Optional[Decimal] = Field(
+        default=None,
+        ge=Decimal('0.0'),
+        le=Decimal('1.0'),
+        description="Confidence score for exit decisions"
+    )
 
     @field_validator('signal_type', mode='before')
     @classmethod

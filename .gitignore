@@ -63,4 +63,4 @@ logs/
 htmlcov/
 
 # Documentation
-docs/_build/
+docs/_build/.hypothesis/
